@@ -7,8 +7,8 @@ CREATE TABLE employees (
   employee_id SERIAL PRIMARY KEY,
   first_name VARCHAR (25) NOT NULL,
   last_name VARCHAR (25) NOT NULL,
-  position_id INT REFERENCES positions (position_id),
-  status VARCHAR (25) NOT NULL,
+  position_id INT REFERENCES positions (position_id) ON DELETE SET NULL,
+  status VARCHAR (25) NOT NULL DEFAULT 'Active',
   created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated TIMESTAMP WITH TIME ZONE
 );
@@ -21,3 +21,10 @@ CREATE TABLE vacations (
   created TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated TIMESTAMP WITH TIME ZONE
 );
+
+INSERT INTO positions(title)
+    VALUES
+      ('developer'),
+      ('designer'),
+      ('manager'),
+      ('accountant');

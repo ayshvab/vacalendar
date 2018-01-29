@@ -6,10 +6,9 @@ import org.http4s._
 import org.http4s.dsl._
 import org.scalatest._
 import cats.effect.IO
-
 import com.vacalendar.conf.DatabaseConfig
-import com.vacalendar.domain.employees.EmployeeService
-import com.vacalendar.repository.EmployeeRepoInterpreter
+import com.vacalendar.domain.employees.{EmployeeService, EmployeeValidationInterpreter}
+import com.vacalendar.repository.{EmployeeRepoInterpreter, PositionRepoInterpreter}
 
 class EmployeesEndpointsSpec
   extends WordSpec
@@ -30,8 +29,10 @@ class EmployeesEndpointsSpec
 
     DatabaseConfig.initDb(dbConf, xa).unsafeRunSync()
 
+    val positionRepo = PositionRepoInterpreter[IO](xa)
     val employeeRepo = EmployeeRepoInterpreter[IO](xa)
-    val employeeService = EmployeeService[IO](employeeRepo)
+    val employeeValidation = EmployeeValidationInterpreter[IO](employeeRepo, positionRepo)
+    val employeeService = EmployeeService[IO](employeeRepo, employeeValidation)
     val employeeEndpoints = EmployeeEndpoints.endpoints[IO](employeeService)
 
     try {
@@ -43,8 +44,8 @@ class EmployeesEndpointsSpec
 
   "Employees" when {
 
-    "GET /employes" should {
-      "bla bla" in withCtx {
+    "GET /employees" should {
+      "return empty array of employees" in withCtx {
         (xa, employeesEndpoints) => {
 
           val request = Request[IO](Method.GET, Uri.uri("/employees"))
@@ -53,12 +54,37 @@ class EmployeesEndpointsSpec
             response <- employeesEndpoints
               .run(request)
               .getOrElse(fail(s"Request was not handled: $request"))
+            responseBody <- response.as[String]
           } yield {
             response.status shouldEqual Ok
+            responseBody   shouldEqual "[]"
           }
 
         }
       }
+
+
+    }
+
+    "GET /employees/:id" should {
+      "Not Found when employee with id not exist" in withCtx {
+        (xa, employeesEndpoints) => {
+          val request = Request[IO](Method.GET, Uri.uri("/employees/1"))
+
+          for {
+            response <- employeesEndpoints
+              .run(request)
+              .getOrElse(fail(s"Request was not handled: $request"))
+            responseBody <- response.as[String]
+          } yield {
+            response.status shouldEqual NotFound
+          }
+
+        }
+      }
+
+      
+
     }
   }
 }

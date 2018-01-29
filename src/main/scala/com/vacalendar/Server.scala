@@ -2,9 +2,9 @@ package com.vacalendar
 
 import cats.effect.{Effect, IO}
 import com.vacalendar.conf.{DatabaseConfig, VacalendarConfig}
-import com.vacalendar.domain.employees.EmployeeService
+import com.vacalendar.domain.employees.{EmployeeService, EmployeeValidationInterpreter}
 import com.vacalendar.endpoint.EmployeeEndpoints
-import com.vacalendar.repository.EmployeeRepoInterpreter
+import com.vacalendar.repository.{EmployeeRepoInterpreter, PositionRepoInterpreter}
 import fs2.{Stream, StreamApp}
 import fs2.StreamApp.ExitCode
 import org.http4s.server.blaze.BlazeBuilder
@@ -23,8 +23,10 @@ object Server extends StreamApp[IO] {
       xa <- Stream.eval(DatabaseConfig.dbTransactor(conf.db))
       _ <- Stream.eval(DatabaseConfig.initDb(conf.db, xa))
 
+      positionRepo = PositionRepoInterpreter[F](xa)
       employeeRepo = EmployeeRepoInterpreter[F](xa)
-      employeeService = EmployeeService[F](employeeRepo)
+      employeeValidation = EmployeeValidationInterpreter[F](employeeRepo, positionRepo)
+      employeeService = EmployeeService[F](employeeRepo, employeeValidation)
 
       exitCode <- BlazeBuilder[F]
         .bindHttp(8080, "localhost")
@@ -33,30 +35,3 @@ object Server extends StreamApp[IO] {
     } yield exitCode
 }
 
-//  // ==> Errors <==
-//  class ErrorCode(val value: String) extends AnyVal // or Enumeration of ErrorCodes
-//
-//  trait Error {
-//    val code: ErrorCode
-//    val message: String
-////    val target
-////    val details
-////    val innererror
-//  }
-//
-//  sealed abstract class ServiceError extends Error
-//  sealed abstract class DatabaseError extends Error
-//  sealed abstract class RequestError extends Error
-//
-//  sealed abstract class ApiError
-//  object ApiError {
-////    final case class Database(err: DatabaseErr) extends ApiError
-//    final case class Service(err: ServiceError) extends ApiError
-////    final case class Request(err: RequestErr) extends ApiError
-//  }
-
-
-//  // ==== Responses ====
-//  case class ErrorResponse(error: Err)
-//  case class ApiErrorResp(error: Error)
-//  // ==== *** ====
