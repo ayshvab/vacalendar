@@ -10,6 +10,7 @@ import fs2.StreamApp.ExitCode
 import org.http4s.server.blaze.BlazeBuilder
 
 object Server extends StreamApp[IO] {
+  import scala.concurrent.ExecutionContext.Implicits.global
 
   val apiV = "v1" // TODO move apiV parameter to Config
 

@@ -3,25 +3,26 @@ import sbt._
 object Dependencies {
 
   object Versions {
+    val Cats        = "1.0.1"
     val CatsEffect  = "0.8"
-    val Fs2         = "0.10.0-RC1"
-    val Http4s      = "0.18.0-M8"
+    val Fs2         = "0.10.1"
+    val Http4s      = "0.18.0"
     val Tsec        = "0.0.1-M7"
     val Circe       = "0.9.1"
-    val Doobie      = "0.5.0-M13"
-    val H2          = "1.4.196"
+    val Doobie      = "0.5.0-RC1"
     val Flyway      = "5.0.5"
-    val Scraper     = "2.0.0"
     val ScalaTest   = "3.0.3"
     val ScalaCheck  = "1.13.4"
     val Logback     = "1.2.1"
-    val TypesafeCfg = "1.3.1"
     val TestcontainersScala = "0.13.0"
     val TestcontainersPostgresql = "1.5.1"
     val PureConfig = "0.9.0"
+    val Fastparse = "1.0.0"
   }
 
   object Libraries {
+    lazy val fastparse      = "com.lihaoyi"         %% "fastparse"                    % Versions.Fastparse
+    lazy val cats           = "org.typelevel"       %% "cats-core"                    % Versions.Cats
     lazy val catsEffect     = "org.typelevel"       %% "cats-effect"                  % Versions.CatsEffect
     lazy val fs2Core        = "co.fs2"              %% "fs2-core"                     % Versions.Fs2
     lazy val fs2IO          = "co.fs2"              %% "fs2-io"                       % Versions.Fs2

@@ -1,51 +1,53 @@
 package com.vacalendar.domain.employees
 
-import java.time.Instant
+import java.time.{ Instant, LocalDate }
+import com.vacalendar.domain.vacations.Vacation
+import com.vacalendar.domain.positions.Position
 
 case class Employee(employeeId: Long,
                     firstName: String,
                     lastName: String,
                     positionId: Long,
-                    status: EmployeeStatus = Active,
                     created: Instant,
                     updated: Option[Instant] = None)
 
-object Employee {
-  def update(oldEmployee: Employee, firstName: String, lastName: String, positionId: Long, status: String): Employee = {
-    oldEmployee.copy(
-      firstName = firstName,
-      lastName = lastName,
-      positionId = positionId,
-      status = EmployeeStatus(status),
-      updated = Some(Instant.now())
-    )
+case class EmployeeIn(firstName: String,
+                      lastName: String,
+                      positionId: Long)
+
+case class EmployeeSummary(employeeId: Long,
+                           firstName: String,
+                           lastName: String,
+                           positionId: Long,
+                           positionTitle: String,
+                           remainedVacationDaysCount: Long,
+                           onVacation: Boolean,
+                           pastVacations: List[Vacation],
+                           currentVacation: Option[Vacation],
+                           futureVacations: List[Vacation]
+                           )
+
+object EmployeeSummary {
+  def apply(employee: Employee, pos: Position, vacs: List[Vacation]): EmployeeSummary = {
+    val vacsBeforeNow = vacs.filter { _.until.isBefore(LocalDate.now()) }
+    val vacsAfterNow = vacs.filter { _.since.isAfter(LocalDate.now()) }
+    val currVac = vacs.find { v => 
+      v.since.isBefore(LocalDate.now()) || v.since.equals(LocalDate.now()) &&
+        v.until.isAfter(LocalDate.now()) || v.until.equals(LocalDate.now())
+    }
+    val vacsDaysCount = vacs.map(vac => vac.until.toEpochDay - vac.since.toEpochDay).sum
+    val remainedVacDaysCount = ValidationRules.maxTotalVacDaysCountPerY - vacsDaysCount
+    val onVacation = currVac.isDefined
+    
+    EmployeeSummary(employee.employeeId,
+                    employee.firstName,
+                    employee.lastName,
+                    pos.positionId,
+                    pos.title,
+                    remainedVacDaysCount,
+                    onVacation,
+                    vacsBeforeNow,
+                    currVac,
+                    vacsAfterNow)
   }
 }
-
-sealed trait EmployeeStatus extends Product with Serializable
-case object Active extends EmployeeStatus
-case object Fired extends EmployeeStatus
-
-object EmployeeStatus {
-  def apply(name: String): EmployeeStatus = name match {
-    case "Active" => Active
-    case "Fired" => Fired
-  }
-
-  def nameOf(status: EmployeeStatus): String = status match {
-    case Active => "Active"
-    case Fired => "Fired"
-  }
-}
-
-case class EmployeeNew(firstName: String,
-                       lastName: String,
-                       positionId: Long)
-
-
-case class EmployeeUpd(firstName: String,
-                       lastName: String,
-                       positionId: Long,
-                       status: String)
-
-

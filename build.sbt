@@ -7,6 +7,7 @@ version := "0.1"
 scalaVersion := "2.12.4"
 
 libraryDependencies ++= Seq(
+  Libraries.fastparse,
   Libraries.catsEffect,
   Libraries.fs2Core,
   Libraries.http4sServer,
@@ -80,3 +81,6 @@ scalacOptions ++= Seq(
 //  "-Ywarn-value-discard"               // Warn when non-Unit expression results are unused.
   // format: on
 )
+
+val badConsoleFlags = Seq("-Xfatal-warnings", "-Ywarn-unused:imports")
+scalacOptions in (Compile, console) ~= (_.filterNot(badConsoleFlags.contains(_)))
