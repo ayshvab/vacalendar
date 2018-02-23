@@ -21,7 +21,7 @@ case class EmployeeSummary(employeeId: Long,
                            positionId: Long,
                            positionTitle: String,
                            remainedVacationDaysCount: Long,
-                           onVacation: Boolean,
+                           isOnVacation: Boolean,
                            pastVacations: List[Vacation],
                            currentVacation: Option[Vacation],
                            futureVacations: List[Vacation]
@@ -37,7 +37,7 @@ object EmployeeSummary {
     }
     val vacsDaysCount = vacs.map(vac => vac.until.toEpochDay - vac.since.toEpochDay).sum
     val remainedVacDaysCount = ValidationRules.maxTotalVacDaysCountPerY - vacsDaysCount
-    val onVacation = currVac.isDefined
+    val isOnVacation = currVac.isDefined
     
     EmployeeSummary(employee.employeeId,
                     employee.firstName,
@@ -45,7 +45,7 @@ object EmployeeSummary {
                     pos.positionId,
                     pos.title,
                     remainedVacDaysCount,
-                    onVacation,
+                    isOnVacation,
                     vacsBeforeNow,
                     currVac,
                     vacsAfterNow)

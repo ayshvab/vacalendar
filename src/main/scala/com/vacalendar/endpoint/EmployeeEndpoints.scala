@@ -1,10 +1,8 @@
 package com.vacalendar.endpoint
 
 import java.time.{Instant, LocalDate}
-// import cats._
 import cats.data._
 import cats.implicits._
-// import cats.data.Validated._
 import cats.effect.Effect
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -16,7 +14,6 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s._
 import com.vacalendar.domain._
 import com.vacalendar.domain.employees._
-// import com.vacalendar.domain.{EmployeeNotFoundError, VacationNotFoundError, ValidationError}
 import com.vacalendar.domain.employees.EmployeeIn
 import com.vacalendar.domain.vacations.VacationIn
 import com.vacalendar.domain.employees.EmployeeService
@@ -42,19 +39,26 @@ class EmployeeEndpoints[F[_]: Effect] extends Http4sDsl[F] {
 
   object OrderByQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("orderBy")
 
-  object FirstNameQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("firstName")
-  object LastNameQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("lastName")
+  object FirstNameQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("firstname")
+  object LastNameQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("lastname")
   object PositionIdQueryParamMatcher extends OptionalQueryParamDecoderMatcher[Long]("positionId")
+  object PositionTitleQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("positionTitle")
   object VacationIdQueryParamMatcher extends OptionalQueryParamDecoderMatcher[Long]("vacationId")
   object EmployeeIdQueryParamMatcher extends OptionalQueryParamDecoderMatcher[Long]("employeeId")
 
   object SinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("since")
-  object SinceBeforeQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("sinceBefore")
-  object SinceAfterQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("sinceAfter")
-
   object UntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("until")
-  object UntilBeforeQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("untilBefore")
-  object UntilAfterQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("untilAfter")
+
+  object OnVacQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("isOnVacation")
+  
+  object CurrVacSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currentVacation.since")
+  object CurrVacUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currentVacation.until")
+  
+  object PastVacsSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("pastVacations.since")
+  object PastVacsUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("pastVacations.until")
+
+  object FutureVacsSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacations.since")
+  object FutureVacsUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacations.until")
 
   private def createEmployeeEndpoint(employeeService: EmployeeService[F]): HttpService[F] =
     HttpService[F] {
@@ -102,8 +106,10 @@ class EmployeeEndpoints[F[_]: Effect] extends Http4sDsl[F] {
         PositionIdQueryParamMatcher(posId) => {
 
           val result = for {
-            qryParams <- EitherT[F, NonEmptyList[ValidationError], EmplsQryParams](QryParamsValidation.validateAndPrepareEmplsQryParams(oBy, fn, ln, posId).pure[F])
-            employees <- EitherT.liftF[F, NonEmptyList[ValidationError], List[Employee]](employeeService.listEmployees(qryParams))
+            qryParams <- EitherT[F, NonEmptyList[ValidationError], EmplsQryParams](
+              QryParamsValidation.validateAndPrepareEmplsQryParams(oBy, fn, ln, posId).pure[F])
+            employees <- EitherT.liftF[F, NonEmptyList[ValidationError], List[Employee]](
+              employeeService.listEmployees(qryParams))
           } yield employees
 
           result.value.flatMap {
@@ -127,22 +133,12 @@ class EmployeeEndpoints[F[_]: Effect] extends Http4sDsl[F] {
     HttpService[F] {
       case GET -> Root / "employees" / LongVar(employeeId) / "vacations" :?
         OrderByQueryParamMatcher(oBy) +&
-        SinceBeforeQueryParamMatcher(sinceBefore) +&
         SinceQueryParamMatcher(since) +&
-        SinceAfterQueryParamMatcher(sinceAfter) +&
-        UntilBeforeQueryParamMatcher(untilBefore) +&
-        UntilQueryParamMatcher(until) +&
-        UntilAfterQueryParamMatcher(untilAfter) => {
+        UntilQueryParamMatcher(until) => {
 
           val result = for {
             qryParams <-  EitherT[F, NonEmptyList[ValidationError], VacsQryParams](
-              QryParamsValidation.validateAndPrepareVacsQryParams(oBy,
-                                                                 sinceBefore,
-                                                                 since,
-                                                                 sinceAfter,
-                                                                 untilBefore,
-                                                                 until,
-                                                                 untilAfter).pure[F])
+              QryParamsValidation.validateAndPrepareVacsQryParams(oBy, since, until).pure[F])
 
             vacs <- employeeService.getVacs(employeeId, qryParams)
           } yield vacs
@@ -213,11 +209,50 @@ class EmployeeEndpoints[F[_]: Effect] extends Http4sDsl[F] {
 
   private def getEmployeesSummaryList(employeeService: EmployeeService[F]): HttpService[F] =
     HttpService[F] {
-      case GET -> Root / "employees" / "view=summary" =>
-        for {
-          employeesSummaryList <- employeeService.getEmployeesSummaryList()
-          resp <- Ok(employeesSummaryList.asJson)
-        } yield resp
+      case GET -> Root / "employees" / "view=summary" :?
+        OrderByQueryParamMatcher(oBy) +&
+        EmployeeIdQueryParamMatcher(emplId) +&
+        FirstNameQueryParamMatcher(fn) +&
+        LastNameQueryParamMatcher(ln) +&
+        PositionIdQueryParamMatcher(posId) +&
+        PositionTitleQueryParamMatcher(posTitle) +&
+        OnVacQueryParamMatcher(isOnVac) +&
+        
+        CurrVacSinceQueryParamMatcher(currVacSince) +&
+        CurrVacUntilQueryParamMatcher(currVacUntil) +&
+        
+        PastVacsSinceQueryParamMatcher(pastVacsSince) +&
+        PastVacsUntilQueryParamMatcher(pastVacsUntil) +&
+        
+        FutureVacsSinceQueryParamMatcher(futureVacsSince) +&
+        FutureVacsUntilQueryParamMatcher(futureVacsUntil) => {
+
+          val result = for {
+            qryParams <- EitherT[F, NonEmptyList[ValidationError], SumrsQryParams](
+              QryParamsValidation.validateAndPrepareSumrsQryParams(oBy = oBy,
+                                                                   emplId = emplId,
+                                                                   fn = fn,
+                                                                   ln = ln,
+                                                                   posId = posId,
+                                                                   posTitle = posTitle,
+                                                                   isOnVac = isOnVac,
+                                                                   
+                                                                   pastVacsSince = pastVacsSince,
+                                                                   pastVacsUntil = pastVacsUntil,
+
+                                                                   currVacSince = currVacSince,
+                                                                   currVacUntil = currVacUntil,
+                                                                   
+                                                                   futureVacsSince = futureVacsSince,
+                                                                   futureVacsUntil = futureVacsUntil).pure[F])
+            sumrs <- EitherT.liftF[F, NonEmptyList[ValidationError], List[EmployeeSummary]](employeeService.getEmployeesSummaryList(qryParams))
+          } yield sumrs
+
+          result.value.flatMap {
+            case Right(sumrs) => Ok(sumrs.asJson)
+            case Left(errors) => BadRequest(errors.asJson)
+          }
+        }
     }
 
   def endpoints(employeeService: EmployeeService[F]): HttpService[F] =
@@ -235,21 +270,38 @@ class EmployeeEndpoints[F[_]: Effect] extends Http4sDsl[F] {
       getEmployeesSummaryList(employeeService)
 }
 
-
 case class EmplsQryParams(orderByParams: Option[OrderByParams] = None,
                           firstName: Option[String] = None,
                           lastName: Option[String] = None,
                           positionId: Option[Long] = None)
 
 case class VacsQryParams(orderByParams: Option[OrderByParams] = None,
-                         sinceBefore: Option[LocalDate] = None,
-                         since: Option[LocalDate] = None,
-                         sinceAfter: Option[LocalDate] = None,
-                         untilBefore: Option[LocalDate] = None,
-                         until: Option[LocalDate] = None,
-                         untilAfter: Option[LocalDate] = None)
+                         since: Option[DateParams] = None,
+                         until: Option[DateParams] = None )
+
+case class SumrsQryParams(orderByParams: Option[OrderByParams] = None,
+
+                          employeeId: Option[Long] = None,
+                          firstName: Option[String] = None,
+                          lastName: Option[String] = None,
+                          positionId: Option[Long] = None,
+                          positionTitle: Option[String] = None,
+                          isOnVac: Option[Boolean] = None,
+                          
+                          pastVacsSince: Option[DateParams] = None,
+                          pastVacsUntil: Option[DateParams] = None,
+                          
+                          currVacSince: Option[DateParams] = None,
+                          currVacUntil: Option[DateParams] = None,
+                          
+                          futureVacsSince: Option[DateParams] = None,
+                          futureVacsUntil: Option[DateParams] = None)
 
 case class OrderByParams(field: String, asc: Boolean)
+
+case class DateParams(before: Option[LocalDate] = None, 
+                      exact: Option[LocalDate] = None, 
+                      after: Option[LocalDate] = None)
 
 object QryParamsValidation {
 
@@ -269,7 +321,10 @@ object QryParamsValidation {
                                 "created" -> "created",
                                 "updated" -> "updated")
 
-  private def validateOrderBy(rawOrderBy: Option[String], fieldsForOrder: Map[String, String]): ValidationResult[Option[OrderByParams]] = {
+  val sumrsOrderFields = List("employeeId", "firstName", "lastName", "positionId", "remainedVacationDays")
+  val sumrsOrderFieldsMap = sumrsOrderFields.zip(sumrsOrderFields).toMap
+
+  private def validateAndPrepareOrderBy(rawOrderBy: Option[String], fieldsForOrder: Map[String, String]): ValidationResult[Option[OrderByParams]] = {
     val preparedField = rawOrderBy flatMap { s =>
       val normalized = s.stripPrefix("-")
       fieldsForOrder.get(normalized)
@@ -286,49 +341,105 @@ object QryParamsValidation {
     }
   }
 
-  def validateAndPrepareEmplsQryParams(rawOrderBy: Option[String],
-                                      firstName: Option[String],
-                                      lastName: Option[String],
-                                      positionId: Option[Long]): Either[NonEmptyList[ValidationError], EmplsQryParams] = {
+  def validateAndPrepareEmplsQryParams(oBy: Option[String],
+                                      fn: Option[String],
+                                      ln: Option[String],
+                                      posId: Option[Long]): Either[NonEmptyList[ValidationError], EmplsQryParams] = {
 
-    val result = validateOrderBy(rawOrderBy, emplsOrderFieldsToDB) map[EmplsQryParams]((o: Option[OrderByParams]) => o match {
-
-      case Some(o) => EmplsQryParams(orderByParams = Some(o),
-                                     firstName = firstName,
-                                     lastName = lastName,
-                                     positionId = positionId)
-
-      case None => EmplsQryParams(firstName = firstName, lastName = lastName, positionId = positionId)
-    })
+    val result = (validateAndPrepareOrderBy(oBy, emplsOrderFieldsToDB),
+                  fn.validNel[ValidationError],
+                  ln.validNel[ValidationError],
+                  posId.validNel[ValidationError]) mapN (EmplsQryParams.apply)
 
     result.toEither
   }
 
-  private def validateLocalDateStr(rawLocalDate: Option[String]): ValidationResult[Option[LocalDate]] = {
-    rawLocalDate match {
+  private def validateAndPrepareLocalDateStr(raw: Option[String]): ValidationResult[Option[DateParams]] = {
+    val prefix = "_.."
+    val suffix = ".._"
+    val sep = Array('.', '.')
+    raw match {
       case None => None.validNel
-      case Some(rld) => Either.catchNonFatal(LocalDate.parse(rld)) match {
+      case Some("_.._") => None.validNel
+      case Some(s) if (s.startsWith(prefix)) => Either.catchNonFatal(LocalDate.parse(s.stripPrefix(prefix))) match {
         case Left(_) => LocalDateParseError.invalidNel
-        case Right(ld) => Some(ld).validNel
+        case Right(b@_) => Some(DateParams(before = Some(b))).validNel
       }
+      case Some(s) if (s.endsWith(suffix)) => Either.catchNonFatal(LocalDate.parse(s.stripSuffix(suffix))) match {
+        case Left(_) => LocalDateParseError.invalidNel
+        case Right(a@_) => Some(DateParams(after = Some(a))).validNel
+      }
+      case Some(s) if (s.contains(sep)) => {
+        Either.catchNonFatal {
+            val Array(a, b) = s.split(sep).filter(_.nonEmpty)
+            DateParams(after = Some(LocalDate.parse(a)), before = Some(LocalDate.parse(b)))
+        } match {
+            case Left(_) => LocalDateParseError.invalidNel
+            case Right(dateParams) => Some(dateParams).validNel
+        }
+      }
+      case Some(s) => Either.catchNonFatal(LocalDate.parse(s)) match {
+        case Left(_) => LocalDateParseError.invalidNel
+        case Right(date) => Some(DateParams(exact = Some(date))).validNel
+      }
+      case _ => LocalDateParseError.invalidNel
+    }
+  }
+
+  private def validateAndPrepareIsOnVac(raw: Option[String]): ValidationResult[Option[Boolean]] = {
+    raw match {
+      case None => None.validNel
+      case Some("t") => Some(true).validNel
+      case Some("f") => Some(false).validNel
+      case Some(_) => NotValidQueryParamError.invalidNel
     }
   }
 
   def validateAndPrepareVacsQryParams(rawOrderBy: Option[String],
-                                     sinceBefore: Option[String],
-                                     since: Option[String],
-                                     sinceAfter: Option[String],
-                                     untilBefore: Option[String],
-                                     until: Option[String],
-                                     untilAfter: Option[String]): Either[NonEmptyList[ValidationError], VacsQryParams] = {
-    
-    val result = (validateOrderBy(rawOrderBy, vacsOrderFieldsToDB),
-                  validateLocalDateStr(sinceBefore),
-                  validateLocalDateStr(since),
-                  validateLocalDateStr(sinceAfter),
-                  validateLocalDateStr(untilBefore),
-                  validateLocalDateStr(until),
-                  validateLocalDateStr(untilAfter)) mapN(VacsQryParams)
+                                      since: Option[String],
+                                      until: Option[String]): Either[NonEmptyList[ValidationError], VacsQryParams] = {
+
+    val result = (validateAndPrepareOrderBy(rawOrderBy, vacsOrderFieldsToDB),
+                  validateAndPrepareLocalDateStr(since),
+                  validateAndPrepareLocalDateStr(until)) mapN(VacsQryParams)
+
+    result.toEither
+  }
+
+  def validateAndPrepareSumrsQryParams(oBy: Option[String],
+                                       emplId: Option[Long],
+                                       fn: Option[String],
+                                       ln: Option[String],
+                                       posId: Option[Long],
+                                       posTitle: Option[String],
+                                       isOnVac: Option[String],
+                                       
+                                       pastVacsSince: Option[String],
+                                       pastVacsUntil: Option[String],
+                                       
+                                       currVacSince: Option[String],
+                                       currVacUntil: Option[String],
+                                       
+                                       futureVacsSince: Option[String],
+                                       futureVacsUntil: Option[String]): Either[NonEmptyList[ValidationError], SumrsQryParams] = {
+
+    val result = (validateAndPrepareOrderBy(oBy, sumrsOrderFieldsMap),
+                  emplId.validNel[ValidationError],
+                  fn.validNel[ValidationError],
+                  ln.validNel[ValidationError],
+                  posId.validNel[ValidationError],
+                  posTitle.validNel[ValidationError],
+
+                  validateAndPrepareIsOnVac(isOnVac),
+
+                  validateAndPrepareLocalDateStr(pastVacsSince),
+                  validateAndPrepareLocalDateStr(pastVacsUntil),
+
+                  validateAndPrepareLocalDateStr(currVacSince),
+                  validateAndPrepareLocalDateStr(currVacUntil),
+
+                  validateAndPrepareLocalDateStr(futureVacsSince),
+                  validateAndPrepareLocalDateStr(futureVacsUntil)) mapN(SumrsQryParams.apply)
 
     result.toEither
   }

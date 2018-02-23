@@ -10,8 +10,13 @@ import doobie.implicits._
 import Fragments._
 import doobie.util.invariant.UnexpectedEnd
 import com.vacalendar.domain.employees._
+
 import com.vacalendar.endpoint.EmplsQryParams
 import com.vacalendar.endpoint.VacsQryParams
+import com.vacalendar.endpoint.SumrsQryParams
+import com.vacalendar.endpoint.DateParams
+import com.vacalendar.endpoint.OrderByParams
+
 import com.vacalendar.domain.vacations.{Vacation, VacationIn}
 import com.vacalendar.domain.positions.Position
 
@@ -95,13 +100,13 @@ object EmployeeSQL {
   def selectVacs(employeeId: Long, qryParams: VacsQryParams = VacsQryParams()): Query0[Vacation] = {
     val whereEmployeeId = Some(fr"employee_id = $employeeId")
 
-    val whereSinceBefore = qryParams.sinceBefore.map(ld => fr"since < $ld")
-    val whereSince = qryParams.since.map(ld => fr"since = $ld")
-    val whereSinceAfter = qryParams.sinceAfter.map(ld => fr"since > $ld")
+    val whereSinceBefore = qryParams.since.flatMap(_.before.map(ld => fr"since < $ld"))
+    val whereSince = qryParams.since.flatMap(_.exact.map(ld => fr"since = $ld"))
+    val whereSinceAfter = qryParams.since.flatMap(_.after.map(ld => fr"since > $ld"))
 
-    val whereUntilBefore = qryParams.untilBefore.map(ld => fr"until < $ld")
-    val whereUntil = qryParams.until.map(ld => fr"until = $ld")
-    val whereUntilAfter = qryParams.untilAfter.map(ld => fr"until > $ld")
+    val whereUntilBefore = qryParams.until.flatMap(_.before.map(ld => fr"until < $ld"))
+    val whereUntil = qryParams.until.flatMap(_.exact.map(ld => fr"until = $ld"))
+    val whereUntilAfter = qryParams.until.flatMap(_.after.map(ld => fr"until > $ld"))
 
     val defaultOrderBy: Fragment = fr"order by vacation_id desc"
 
@@ -282,7 +287,7 @@ class EmployeeRepoInterpreter[F[_]](val xa: Transactor[F])
     }
   }
 
-  def getEmployeesSummaryList(): F[List[EmployeeSummary]] = {
+  def getEmployeesSummaryList(qryParams: SumrsQryParams = SumrsQryParams()): F[List[EmployeeSummary]] = {
     val program: ConnectionIO[List[EmployeeSummary]] = for {
       employees <- EmployeeSQL.selectEmployees().list
       employeesSummary <- employees.reverse.traverse { empl =>
@@ -291,9 +296,83 @@ class EmployeeRepoInterpreter[F[_]](val xa: Transactor[F])
           vacs <- EmployeeSQL.selectEmployeeVacsCurrY(empl.employeeId).list
         } yield EmployeeSummary(empl, pos, vacs)
       }
-    } yield employeesSummary
+    } yield filterOrderEmplsSmryList(employeesSummary, qryParams) 
 
     program.transact(xa)
+  }
+
+  def filterOrderEmplsSmryList(emplsSumrList: List[EmployeeSummary], qryParams: SumrsQryParams): List[EmployeeSummary] = {
+    val go = (dp: DateParams, vd: LocalDate) => 
+      dp.before.map(b => vd.isBefore(b)).getOrElse(true) &
+      dp.exact.map(e => vd.isEqual(e)).getOrElse(true) &
+      dp.after.map(a => vd.isAfter(a)).getOrElse(true)
+    
+    val filters = Seq(
+      qryParams.employeeId.map(emplId => (sumry: EmployeeSummary) => sumry.employeeId == emplId),
+
+      qryParams.firstName.map(fn => (sumry: EmployeeSummary) => sumry.firstName == fn),
+      qryParams.lastName.map(ln => (sumry: EmployeeSummary) => sumry.lastName == ln),
+
+      qryParams.positionId.map(posId => (sumry: EmployeeSummary) => sumry.positionId == posId),
+      qryParams.positionTitle.map(posTitle => (sumry: EmployeeSummary) => sumry.positionTitle == posTitle),
+
+      qryParams.isOnVac.map(is => (sumry: EmployeeSummary) => sumry.isOnVacation == is),
+
+      qryParams.pastVacsSince.map(dateParams => 
+        (sumry: EmployeeSummary) => sumry.pastVacations.exists((vac: Vacation) => go(dateParams, vac.since))),
+      qryParams.pastVacsUntil.map(dateParams => 
+        (sumry: EmployeeSummary) => sumry.pastVacations.exists((vac: Vacation) => go(dateParams, vac.until))),
+
+      qryParams.currVacSince.map(dateParams => 
+        (sumry: EmployeeSummary) => 
+          sumry.currentVacation.map((vac: Vacation) => go(dateParams, vac.since)).getOrElse(true)),
+      qryParams.currVacUntil.map(dateParams => 
+        (sumry: EmployeeSummary) => 
+          sumry.currentVacation.map((vac: Vacation) => go(dateParams, vac.until)).getOrElse(true)),
+
+      qryParams.futureVacsSince.map(dateParams => 
+        (sumry: EmployeeSummary) => sumry.futureVacations.exists((vac: Vacation) => go(dateParams, vac.since))),
+      qryParams.futureVacsUntil.map(dateParams => 
+        (sumry: EmployeeSummary) => sumry.futureVacations.exists((vac: Vacation) => go(dateParams, vac.until)))
+    )
+
+    val actualFilters = filters.filter(_.isDefined).map(_.get)
+
+    val defaultOrderBy = (sumry1: EmployeeSummary, sumry2: EmployeeSummary) => 
+        sumry1.employeeId.compareTo(sumry2.employeeId) < 0
+
+    val orderBy = qryParams.orderByParams match {
+      case None => defaultOrderBy
+
+      case Some(oBy) => oBy match {
+
+        case (OrderByParams("employeeId", asc)) => 
+          (sumry1: EmployeeSummary, sumry2: EmployeeSummary) => 
+            asc == sumry1.employeeId.compareTo(sumry2.employeeId) < 0
+
+        case OrderByParams("firstName", asc) => 
+          (sumry1: EmployeeSummary, sumry2: EmployeeSummary) =>
+            asc == sumry1.firstName.compareTo(sumry2.firstName) < 0
+
+        case OrderByParams("lastName", asc) => 
+          (sumry1: EmployeeSummary, sumry2: EmployeeSummary) =>
+            asc == sumry1.lastName.compareTo(sumry2.lastName) < 0
+
+        case OrderByParams("positionId", asc) => 
+          (sumry1: EmployeeSummary, sumry2: EmployeeSummary) =>
+            asc == sumry1.positionId.compareTo(sumry2.positionId) < 0
+
+        case OrderByParams("remainedVacationDays", asc) => 
+          (sumry1: EmployeeSummary, sumry2: EmployeeSummary) =>
+            asc == sumry1.remainedVacationDaysCount.compareTo(sumry2.remainedVacationDaysCount) < 0
+
+        case _ => defaultOrderBy
+        }
+    }
+
+    emplsSumrList
+      .filter(sumry => actualFilters.forall(filter => filter(sumry)))
+      .sortWith(orderBy)
   }
 }
 object EmployeeRepoInterpreter {

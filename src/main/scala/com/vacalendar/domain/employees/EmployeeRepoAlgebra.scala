@@ -5,6 +5,7 @@ import java.time.LocalDate
 import com.vacalendar.domain.vacations.{ Vacation, VacationIn }
 import com.vacalendar.endpoint.EmplsQryParams
 import com.vacalendar.endpoint.VacsQryParams
+import com.vacalendar.endpoint.SumrsQryParams
 
 trait EmployeeRepoAlgebra[F[_]] {
   def createEmployee(employeeIn: EmployeeIn): F[Employee]
@@ -37,5 +38,5 @@ trait EmployeeRepoAlgebra[F[_]] {
 
   def getEmployeeSummary(employeeId: Long): F[Option[EmployeeSummary]]
 
-  def getEmployeesSummaryList(): F[List[EmployeeSummary]]
+  def getEmployeesSummaryList(qryParams: SumrsQryParams): F[List[EmployeeSummary]]
 }

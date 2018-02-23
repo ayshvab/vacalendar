@@ -51,4 +51,5 @@ case object CannotChangeOrDeleteCurrentOrFutureVacationsError extends Validation
 case object NotIdenticalEmployeeIdsError extends ValidationError
 
 case object NotValidOrderByParamError extends ValidationError
+case object NotValidQueryParamError extends ValidationError
 case object LocalDateParseError extends ValidationError

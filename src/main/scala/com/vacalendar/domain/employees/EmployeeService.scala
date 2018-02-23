@@ -8,6 +8,8 @@ import com.vacalendar.domain.vacations.{Vacation, VacationIn}
 import com.vacalendar.common.Log
 import com.vacalendar.endpoint.EmplsQryParams
 import com.vacalendar.endpoint.VacsQryParams
+import com.vacalendar.endpoint.SumrsQryParams
+
 
 class EmployeeService[F[_]: Effect](employeeRepo: EmployeeRepoAlgebra[F],
                                     validation: EmployeeValidationAlgebra[F])
@@ -16,7 +18,7 @@ class EmployeeService[F[_]: Effect](employeeRepo: EmployeeRepoAlgebra[F],
   def getEmployeeSummary(employeeId: Long): EitherT[F, EmployeeNotFoundError.type, EmployeeSummary] = 
     EitherT.fromOptionF(employeeRepo.getEmployeeSummary(employeeId), EmployeeNotFoundError)
 
-  def getEmployeesSummaryList(): F[List[EmployeeSummary]] = employeeRepo.getEmployeesSummaryList()
+  def getEmployeesSummaryList(qryParams: SumrsQryParams): F[List[EmployeeSummary]] = employeeRepo.getEmployeesSummaryList(qryParams)
 
   def listEmployees(qryParams: EmplsQryParams): F[List[Employee]] = employeeRepo.listEmployees(qryParams)
 
