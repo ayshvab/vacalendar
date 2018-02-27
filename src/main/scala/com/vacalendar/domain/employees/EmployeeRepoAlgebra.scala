@@ -22,21 +22,22 @@ trait EmployeeRepoAlgebra[F[_]] {
 
   def getVacs(employeeId: Long, qryParams: VacsQryParams): F[List[Vacation]]
 
-  def getEmployeeVacsCurrY(employeeId: Long): F[List[Vacation]]
+  def getEmplVacsCurrYear(employeeId: Long): F[List[Vacation]]
+  
+  def getOverlappedPosIdVacs(posId: Long,
+                             startVac: LocalDate,
+                             endVac: LocalDate): F[List[Vacation]]
 
-  def getEmployeeVacsOverlappedPosIdVacsForCurrY(posId: Long,
-                                                 startVac: LocalDate,
-                                                 endVac: LocalDate): F[List[Vacation]]
+  def getEmplsByPosId(posId: Long): F[List[Employee]]
 
-  def getEmployeesByPosId(posId: Long): F[List[Employee]]
+  def deleteVac(emplId: Long, vacId: Long): F[Option[Vacation]]
 
-  def deleteVac(employeeId: Long, vacId: Long): F[Option[Vacation]]
+  def createVac(emplId: Long, vacNew: VacationIn): F[Vacation]
 
-  def createVac(vacNew: VacationIn): F[Vacation]
-
-  def updateVac(vacId: Long, vacIn: VacationIn): F[Option[Vacation]]
+  def updateVac(emplId: Long, vacId: Long, vacIn: VacationIn): F[Option[Vacation]]
 
   def getEmployeeSummary(employeeId: Long): F[Option[EmployeeSummary]]
 
   def getEmployeesSummaryList(qryParams: SumrsQryParams): F[List[EmployeeSummary]]
+
 }

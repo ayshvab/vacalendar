@@ -36,7 +36,7 @@ object EmployeeSummary {
         v.until.isAfter(LocalDate.now()) || v.until.equals(LocalDate.now())
     }
     val vacsDaysCount = vacs.map(vac => vac.until.toEpochDay - vac.since.toEpochDay).sum
-    val remainedVacDaysCount = ValidationRules.maxTotalVacDaysCountPerY - vacsDaysCount
+    val remainedVacDaysCount = ValidationRules.vacDaysMaxCountPerYear - vacsDaysCount
     val isOnVacation = currVac.isDefined
     
     EmployeeSummary(employee.employeeId,

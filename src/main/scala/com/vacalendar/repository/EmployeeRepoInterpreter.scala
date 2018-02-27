@@ -140,19 +140,19 @@ object EmployeeSQL {
     """
     .query[Vacation]
 
-  def insertVac(vacIn: VacationIn): Query0[Vacation] =
+  def insertVac(emplId: Long, vacIn: VacationIn): Query0[Vacation] =
     sql"""
       INSERT INTO vacations (employee_id, since, until)
-      VALUES (${vacIn.employeeId}, ${vacIn.since}, ${vacIn.until})
+      VALUES (${emplId}, ${vacIn.since}, ${vacIn.until})
       RETURNING *
     """
     .query[Vacation]
 
-  def updateVac(vacId: Long, vacIn: VacationIn): Query0[Vacation] =
+  def updateVac(emplId: Long, vacId: Long, vacIn: VacationIn): Query0[Vacation] =
     sql"""
       UPDATE vacations
       SET
-        employee_id = ${vacIn.employeeId},
+        employee_id = ${emplId},
         since = ${vacIn.since},
         until = ${vacIn.until},
         updated = ${Instant.now()}
@@ -177,11 +177,11 @@ object EmployeeSQL {
     selectEmployeeVacsForPeriod(employeeId, startY, endY)
   }
 
-  def selectEmployeeVacsOverlappedPosIdVacsForPeriod(posId: Long,
-                                                     vacStart: LocalDate,
-                                                     vacEnd: LocalDate,
-                                                     startPeriod: LocalDate,
-                                                     endPeriod: LocalDate): Query0[Vacation] =
+  def selectOverlappedPosIdVacsForPeriod(posId: Long,
+                                         vacStart: LocalDate,
+                                         vacEnd: LocalDate,
+                                         startPeriod: LocalDate,
+                                         endPeriod: LocalDate): Query0[Vacation] =
     sql"""
       SELECT
         vacations.*
@@ -245,35 +245,35 @@ class EmployeeRepoInterpreter[F[_]](val xa: Transactor[F])
   def getVacs(employeeId: Long, qryParams: VacsQryParams): F[List[Vacation]] =
     EmployeeSQL.selectVacs(employeeId, qryParams).list.transact(xa)
 
-  def getEmployeeVacsCurrY(employeeId: Long): F[List[Vacation]] = {
+  def getEmplVacsCurrYear(employeeId: Long): F[List[Vacation]] = {
     val currY = Year.now()
     val startY = LocalDate.of(currY.getValue, 1, 1)
     val endY = LocalDate.of(currY.getValue, 12, 31)
     EmployeeSQL.selectEmployeeVacsForPeriod(employeeId, startY, endY).list.transact(xa)
   }
 
-  def getEmployeeVacsOverlappedPosIdVacsForCurrY(posId: Long,
-                                                 startVac: LocalDate,
-                                                 endVac: LocalDate): F[List[Vacation]] = {
+  def getOverlappedPosIdVacs(posId: Long,
+                             startVac: LocalDate,
+                             endVac: LocalDate): F[List[Vacation]] = {
     val currY = Year.now()
     val startY = LocalDate.of(currY.getValue, 1, 1)
     val endY = LocalDate.of(currY.getValue, 12, 31)
-    EmployeeSQL.selectEmployeeVacsOverlappedPosIdVacsForPeriod(posId, startVac, endVac, startY, endY)
+    EmployeeSQL.selectOverlappedPosIdVacsForPeriod(posId, startVac, endVac, startY, endY)
       .list.transact(xa)
   }
 
-  def getEmployeesByPosId(posId: Long): F[List[Employee]] = {
+  def getEmplsByPosId(posId: Long): F[List[Employee]] = {
     EmployeeSQL.selectEmployeesByPosId(posId).list.transact(xa)
   }
 
   def deleteVac(employeeId: Long, vacId: Long): F[Option[Vacation]] =
     EmployeeSQL.deleteVac(employeeId, vacId).option.transact(xa)
 
-  def createVac(vacIn: VacationIn): F[Vacation] =
-    EmployeeSQL.insertVac(vacIn).unique.transact(xa)
+  def createVac(emplId: Long, vacIn: VacationIn): F[Vacation] =
+    EmployeeSQL.insertVac(emplId, vacIn).unique.transact(xa)
 
-  def updateVac(vacId: Long, vacIn: VacationIn): F[Option[Vacation]] =
-    EmployeeSQL.updateVac(vacId, vacIn).option.transact(xa)
+  def updateVac(emplId: Long, vacId: Long, vacIn: VacationIn): F[Option[Vacation]] =
+    EmployeeSQL.updateVac(emplId, vacId, vacIn).option.transact(xa)
 
   def getEmployeeSummary(employeeId: Long): F[Option[EmployeeSummary]] = {
     val program: ConnectionIO[EmployeeSummary] = for {

@@ -6,19 +6,19 @@ import com.vacalendar.domain.vacations.VacationIn
 
 trait EmployeeValidationAlgebra[F[_]] {
 
-  def checkEmployeeExist(employeeId: Long): EitherT[F, NonEmptyList[ValidationError], Employee]
+  def validateEmplIn(emplIn: EmployeeIn): EitherT[F, NonEmptyList[ValidationError], EmployeeIn]
 
-  def checkCreateEmployee(employeeIn: EmployeeIn): EitherT[F, NonEmptyList[ValidationError], EmployeeIn]
+  def checkEmplExist(emplId: Long): EitherT[F, NonEmptyList[ValidationError], Employee]
 
-  def checkUpdateEmployee(employeeId: Long,
-                          employeeIn: EmployeeIn): EitherT[F, NonEmptyList[ValidationError], EmployeeIn]
-
-  def checkCreateVac(employeeId: Long, vacIn: VacationIn): EitherT[F, NonEmptyList[ValidationError], VacationIn]
-
-  def checkIsChangeableVac(employeeId: Long,
+  def checkVacIsChangeable(emplId: Long,
                            vacId: Long): EitherT[F, NonEmptyList[ValidationError], Unit]
 
-  def checkUpdateVac(employeeId: Long,
-                     vacId: Long,
-                     vacIn: VacationIn): EitherT[F, NonEmptyList[ValidationError], VacationIn]
+  def basicValidateVacIn(vacIn: VacationIn): Either[NonEmptyList[ValidationError], VacationIn]
+
+  def validateVacInCreate(vacIn: VacationIn, 
+                          empl: Employee): EitherT[F, NonEmptyList[ValidationError], VacationIn]
+
+  def validateVacInUpdate(vacId: Long, 
+                          vacIn: VacationIn, 
+                          empl: Employee): EitherT[F, NonEmptyList[ValidationError], VacationIn]
 }

@@ -11,14 +11,14 @@ import com.vacalendar.domain._
 import com.vacalendar.domain.vacations.{Vacation, VacationIn}
 
 object ValidationRules {
-  val maxTotalVacDaysCountPerY = 24
+  val vacDaysMaxCountPerYear = 24
   val maxVacPeriod = 15
   val minVacPeriod = 2
   val posIdOnVacRate = 0.5
 }
 
-class EmployeeValidationInterpreter[F[_]: Monad](employeeRepo: EmployeeRepoAlgebra[F],
-                                                 positionRepo: PositionRepoAlgebra[F])
+class EmployeeValidationInterpreter[F[_]: Monad](emplRepo: EmployeeRepoAlgebra[F],
+                                                 posRepo: PositionRepoAlgebra[F])
   extends EmployeeValidationAlgebra[F] {
 
   type ValidationResult[A] = ValidatedNel[ValidationError, A]
@@ -48,7 +48,7 @@ class EmployeeValidationInterpreter[F[_]: Monad](employeeRepo: EmployeeRepoAlgeb
     if (vacIn.since.isBefore(vacIn.until)) ().validNel
     else VacationMustStartBeforeUntilError.invalidNel
 
-  private def validateVacPeriodWithin1Y(vacIn: VacationIn): ValidationResult[Unit] =
+  private def validateVacPeriodWithin1Year(vacIn: VacationIn): ValidationResult[Unit] =
     if (vacIn.since.getYear == vacIn.until.getYear) ().validNel
     else VacationMustStartAndEndOnOneYear.invalidNel
 
@@ -99,80 +99,93 @@ class EmployeeValidationInterpreter[F[_]: Monad](employeeRepo: EmployeeRepoAlgeb
     else NotEnoughDaysToNextVacationError.invalidNel
   }
 
-  private def validateVacDaysTotalCountPerY(vacIn: VacationIn, currYVacs: List[Vacation]): ValidationResult[Unit] = {
-    val vacsDaysCount = currYVacs.map(vac => vac.until.toEpochDay - vac.since.toEpochDay).sum
-    val remainedVacDaysCount = ValidationRules.maxTotalVacDaysCountPerY - vacsDaysCount
+  private def validateVacDaysTotalCountPerYear(vacIn: VacationIn, vacsCurrYear: List[Vacation]): ValidationResult[Unit] = {
+    val vacsDaysCount = vacsCurrYear.map(vac => vac.until.toEpochDay - vac.since.toEpochDay).sum
+    val remainedVacDaysCount = ValidationRules.vacDaysMaxCountPerYear - vacsDaysCount
     val vacInPeriod = vacIn.until.toEpochDay - vacIn.since.toEpochDay
     if (vacInPeriod >= remainedVacDaysCount) OutOfTotalVacationDaysPerYearError.invalidNel
     else ().validNel
   }
 
-  private def validatePosIdOnVacRate(vacIn: VacationIn,
-                                     employeesOnVacWithSamePosIdCount: Int,
-                                     employeesWithSamePosIdCount: Int): ValidationResult[Unit] = {
+  private def validatePosIdOnVacRate(emplsOnVacWithSamePosIdCount: Int,
+                                     emplsWithSamePosIdCount: Int): ValidationResult[Unit] = {
 
-    val rate = (employeesOnVacWithSamePosIdCount.toFloat + 1) / employeesWithSamePosIdCount
-    val isRateOk = rate <= ValidationRules.posIdOnVacRate
-    if (isRateOk) ().validNel
+    val rate = (emplsOnVacWithSamePosIdCount.toFloat) / emplsWithSamePosIdCount
+    if (rate <= ValidationRules.posIdOnVacRate) ().validNel
     else TooManyEmployeesOfOnePositionOnVacationError.invalidNel
   }
 
-  private def checkVacIn(vacIn: VacationIn, employee: Employee): EitherT[F, NonEmptyList[ValidationError], VacationIn] = {
-    val check1 = (
-      validateVacDirection(vacIn),
-      validateVacOnlyInFuture(vacIn),
-      validateVacPeriodWithin1Y(vacIn),
-      validateMinVacPeriod(vacIn),
-      validateMaxVacPeriod(vacIn)
-    ).mapN((_, _, _, _, _) => vacIn).toEither
+  def basicValidateVacIn(vacIn: VacationIn): Either[NonEmptyList[ValidationError], VacationIn] = {
+    (validateVacDirection(vacIn),
+     validateVacOnlyInFuture(vacIn),
+     validateVacPeriodWithin1Year(vacIn),
+     validateMinVacPeriod(vacIn),
+     validateMaxVacPeriod(vacIn)
+    ).tupled.map((_) => vacIn).toEither
+  }
 
-    lazy val check2 = for {
-      currYEmployeeVacs <- employeeRepo.getEmployeeVacsCurrY(vacIn.employeeId)
+  def validateVacInCreate(vacIn: VacationIn, empl: Employee): EitherT[F, NonEmptyList[ValidationError], VacationIn] = {
+    val res = for {
+      emplVacsCurrYear <- emplRepo.getEmplVacsCurrYear(empl.employeeId)
 
-      overlappedVacsWithSamePosId <- employeeRepo.getEmployeeVacsOverlappedPosIdVacsForCurrY(
-        employee.positionId, vacIn.since, vacIn.until)
+      overlappedVacsWithSamePosId <- emplRepo
+        .getOverlappedPosIdVacs(empl.positionId, vacIn.since, vacIn.until)
 
-      employeesWithSamePosId <- employeeRepo.getEmployeesByPosId(employee.positionId)
-      
-      employeesOnVacWithSamePosIdCount = overlappedVacsWithSamePosId.groupBy(_.employeeId).size
-      employeesWithSamePosIdCount = employeesWithSamePosId.length
+      emplsWithSamePosId <- emplRepo.getEmplsByPosId(empl.positionId)
+
+      emplsOnVacWithSamePosIdCount = overlappedVacsWithSamePosId.groupBy(_.employeeId).size + 1
+      emplsWithSamePosIdCount = emplsWithSamePosId.length
     } yield (
-      validateVacNotOverlap(vacIn, currYEmployeeVacs),
-      validatePeriodFromLastVac(vacIn, currYEmployeeVacs), 
-      validatePeriodToNextVac(vacIn, currYEmployeeVacs),
-      validateVacDaysTotalCountPerY(vacIn, currYEmployeeVacs),
-      validatePosIdOnVacRate(vacIn, employeesOnVacWithSamePosIdCount, employeesWithSamePosIdCount)
-    ).mapN((_, _, _, _, _) => vacIn).toEither
+      validateVacNotOverlap(vacIn, emplVacsCurrYear),
+      validatePeriodFromLastVac(vacIn, emplVacsCurrYear), 
+      validatePeriodToNextVac(vacIn, emplVacsCurrYear),
+      validateVacDaysTotalCountPerYear(vacIn, emplVacsCurrYear),
+      validatePosIdOnVacRate(emplsOnVacWithSamePosIdCount, emplsWithSamePosIdCount)
+    ).tupled.map((_) => vacIn).toEither
 
+    EitherT(res)
+  }
+
+  def validateVacInUpdate(vacId: Long, vacIn: VacationIn, empl: Employee): EitherT[F, NonEmptyList[ValidationError], VacationIn] = {
+
+    val res = for {
+      emplVacsCurrYear <- emplRepo
+        .getEmplVacsCurrYear(empl.employeeId)
+        .map(_.filter(v => v.vacationId != vacId))
+  
+      overlappedVacsWithSamePosId <- emplRepo
+        .getOverlappedPosIdVacs(empl.positionId, vacIn.since, vacIn.until)
+        .map(_.filter(v => v.vacationId != vacId))
+        
+      emplsWithSamePosId <- emplRepo.getEmplsByPosId(empl.positionId)
+      
+      emplsOnVacWithSamePosIdCount = overlappedVacsWithSamePosId.groupBy(_.employeeId).size + 1
+      emplsWithSamePosIdCount = emplsWithSamePosId.length
+    } yield (
+      validateVacNotOverlap(vacIn, emplVacsCurrYear),
+      validatePeriodFromLastVac(vacIn, emplVacsCurrYear), 
+      validatePeriodToNextVac(vacIn, emplVacsCurrYear),
+      validateVacDaysTotalCountPerYear(vacIn, emplVacsCurrYear),
+      validatePosIdOnVacRate(emplsOnVacWithSamePosIdCount, emplsWithSamePosIdCount)
+    ).tupled.map((_) => vacIn).toEither
+
+    EitherT(res)
+  }
+
+  def checkVacIsChangeable(emplId: Long, vacId: Long): EitherT[F, NonEmptyList[ValidationError], Unit] = {
     for {
-      _ <- EitherT.fromEither(check1)
-      validVacIn <- EitherT(check2)
-    } yield validVacIn
+      vac <- EitherT.fromOptionF[F, NonEmptyList[ValidationError], Vacation](
+        emplRepo.getVac(emplId, vacId), NonEmptyList.one(NotFoundError))
+      _ <- EitherT.fromEither {
+        if (LocalDate.now().isBefore(vac.since)) Either.right[NonEmptyList[ValidationError], Unit](())
+        else Either.left[NonEmptyList[ValidationError], Unit](NonEmptyList.one(CannotChangeOrDeleteCurrentOrFutureVacationsError))
+      }
+    } yield ()
   }
 
-  private def checkIdentityEmployeeIds(employeeIdFromUrl: Long,
-                                       employeeIdFromVacationIn: Long): Either[NonEmptyList[ValidationError], Unit] = {
-    if (employeeIdFromUrl != employeeIdFromVacationIn)
-      Either.left[NonEmptyList[ValidationError], Unit](NonEmptyList.one(NotIdenticalEmployeeIdsError))
-    else
-      Either.right[NonEmptyList[ValidationError], Unit](())
-  }
-
-  private def checkEmployeeIn(employeeIn: EmployeeIn): EitherT[F, NonEmptyList[ValidationError], EmployeeIn] = {
+  def checkEmplExist(employeeId: Long): EitherT[F, NonEmptyList[ValidationError], Employee] = {
     val result = for {
-      foundPos <- positionRepo.get(employeeIn.positionId: Long)
-
-      validatedFirstName = validateFirstName(employeeIn.firstName)
-      validatedLastName = validateLastName(employeeIn.lastName)
-      validatedPosId = validatePosIdExist(foundPos)
-    } yield (validatedFirstName, validatedLastName, validatedPosId).mapN(EmployeeIn).toEither
-
-    EitherT(result)
-  }
-
-  def checkEmployeeExist(employeeId: Long): EitherT[F, NonEmptyList[ValidationError], Employee] = {
-    val result = for {
-      exist <- employeeRepo.getEmployee(employeeId).map { found =>
+      exist <- emplRepo.getEmployee(employeeId).map { found =>
         if (found.isEmpty) Either.left[NonEmptyList[ValidationError], Employee](NonEmptyList.one(EmployeeNotFoundError))
         else Either.right[NonEmptyList[ValidationError], Employee](found.get)
       }
@@ -181,45 +194,21 @@ class EmployeeValidationInterpreter[F[_]: Monad](employeeRepo: EmployeeRepoAlgeb
     EitherT(result)
   }
 
-  def checkCreateEmployee(employeeIn: EmployeeIn): EitherT[F, NonEmptyList[ValidationError], EmployeeIn] =
-    checkEmployeeIn(employeeIn)
+  def validateEmplIn(emplIn: EmployeeIn): EitherT[F, NonEmptyList[ValidationError], EmployeeIn] = {
+    val result = for {
+      foundPos <- posRepo.get(emplIn.positionId: Long)
 
-  def checkUpdateEmployee(employeeId: Long, employeeIn: EmployeeIn): EitherT[F, NonEmptyList[ValidationError], EmployeeIn] =
-    for {
-      _ <- checkEmployeeExist(employeeId)
-      checkedEmployeeIn <- checkEmployeeIn(employeeIn)
-    } yield checkedEmployeeIn
+      validatedFirstName = validateFirstName(emplIn.firstName)
+      validatedLastName = validateLastName(emplIn.lastName)
+      validatedPosId = validatePosIdExist(foundPos)
+    } yield (validatedFirstName, validatedLastName, validatedPosId).mapN(EmployeeIn).toEither
 
-  def checkCreateVac(employeeId: Long, vacIn: VacationIn): EitherT[F, NonEmptyList[ValidationError], VacationIn] =
-    for {
-      _ <- EitherT.fromEither { checkIdentityEmployeeIds(employeeId, vacIn.employeeId) }
-      employee <- checkEmployeeExist(vacIn.employeeId)
-      checkedVacIn <- checkVacIn(vacIn, employee)
-    } yield checkedVacIn
-
-
-  def checkUpdateVac(employeeId: Long, vacId: Long, vacIn: VacationIn): EitherT[F, NonEmptyList[ValidationError], VacationIn] = {
-    for {
-      _ <- EitherT.fromEither { checkIdentityEmployeeIds(employeeId, vacIn.employeeId) }
-      _ <- checkIsChangeableVac(employeeId, vacId)
-      employee <- checkEmployeeExist(vacIn.employeeId)
-      validVacIn <- checkVacIn(vacIn, employee)
-    } yield validVacIn
+    EitherT(result)
   }
 
-  def checkIsChangeableVac(employeeId: Long, vacId: Long): EitherT[F, NonEmptyList[ValidationError], Unit] = {
-    for {
-      vacation <- EitherT.fromOptionF[F, NonEmptyList[ValidationError], Vacation](
-        employeeRepo.getVac(employeeId, vacId), NonEmptyList.one(NotFoundError))
-      _ <- EitherT.fromEither {
-        if (LocalDate.now().isBefore(vacation.since)) Either.right[NonEmptyList[ValidationError], Unit](())
-        else Either.left[NonEmptyList[ValidationError], Unit](NonEmptyList.one(CannotChangeOrDeleteCurrentOrFutureVacationsError))
-      }
-    } yield ()
-  }
 }
 
 object EmployeeValidationInterpreter {
-  def apply[F[_]: Monad](employeeRepo: EmployeeRepoAlgebra[F], positionRepo: PositionRepoAlgebra[F]) =
-    new EmployeeValidationInterpreter[F](employeeRepo, positionRepo)
+  def apply[F[_]: Monad](emplRepo: EmployeeRepoAlgebra[F], posRepo: PositionRepoAlgebra[F]) =
+    new EmployeeValidationInterpreter[F](emplRepo, posRepo)
 }

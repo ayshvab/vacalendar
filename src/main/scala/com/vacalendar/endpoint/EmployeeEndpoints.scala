@@ -49,16 +49,16 @@ class EmployeeEndpoints[F[_]: Effect] extends Http4sDsl[F] {
   object SinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("since")
   object UntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("until")
 
-  object OnVacQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("isOnVacation")
+  object OnVacQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("isOnVacacation")
   
-  object CurrVacSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currentVacation.since")
-  object CurrVacUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currentVacation.until")
+  object CurrVacSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currVac.since")
+  object CurrVacUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currVac.until")
   
-  object PastVacsSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("pastVacations.since")
-  object PastVacsUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("pastVacations.until")
+  object PastVacsSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("pastVacs.since")
+  object PastVacsUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("pastVacs.until")
 
-  object FutureVacsSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacations.since")
-  object FutureVacsUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacations.until")
+  object FutureVacsSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacs.since")
+  object FutureVacsUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacs.until")
 
   private def createEmployeeEndpoint(employeeService: EmployeeService[F]): HttpService[F] =
     HttpService[F] {
@@ -309,8 +309,8 @@ object QryParamsValidation {
 
   val emplsOrderFieldsToDB = Map("employeeId" -> "employee_id",
                                  "positionId" -> "position_id",
-                                 "firstName" -> "first_name",
-                                 "lastName" -> "last_name",
+                                 "firstname" -> "first_name",
+                                 "lastname" -> "last_name",
                                  "created" -> "created",
                                  "updated" -> "updated")
 

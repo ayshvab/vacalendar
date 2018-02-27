@@ -9,6 +9,5 @@ case class Vacation(vacationId: Long,
                     created: Instant,
                     updated: Option[Instant] = None)
 
-case class VacationIn(employeeId: Long,
-                      since: LocalDate,
+case class VacationIn(since: LocalDate,
                       until: LocalDate)
