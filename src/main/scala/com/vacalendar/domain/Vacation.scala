@@ -1,6 +1,6 @@
-package com.vacalendar.domain.vacations
+package com.vacalendar.domain
 
-import java.time.{Instant, LocalDate}
+import java.time.{ Instant, LocalDate }
 
 case class Vacation(vacationId: Long,
                     employeeId: Long,

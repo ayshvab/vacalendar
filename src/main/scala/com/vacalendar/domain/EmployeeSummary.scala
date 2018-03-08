@@ -1,19 +1,7 @@
-package com.vacalendar.domain.employees
+package com.vacalendar.domain
 
-import java.time.{ Instant, LocalDate }
-import com.vacalendar.domain.vacations.Vacation
-import com.vacalendar.domain.positions.Position
-
-case class Employee(employeeId: Long,
-                    firstName: String,
-                    lastName: String,
-                    positionId: Long,
-                    created: Instant,
-                    updated: Option[Instant] = None)
-
-case class EmployeeIn(firstName: String,
-                      lastName: String,
-                      positionId: Long)
+import java.time.LocalDate
+import com.vacalendar.validation.ValidationRules
 
 case class EmployeeSummary(employeeId: Long,
                            firstName: String,

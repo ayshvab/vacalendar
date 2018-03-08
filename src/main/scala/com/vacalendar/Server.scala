@@ -1,38 +1,38 @@
 package com.vacalendar
 
 import cats.effect.{Effect, IO}
-import com.vacalendar.conf.{DatabaseConfig, VacalendarConfig}
-import com.vacalendar.domain.employees.{EmployeeService, EmployeeValidationInterpreter}
-import com.vacalendar.endpoint.EmployeeEndpoints
-import com.vacalendar.repository.{EmployeeRepoInterpreter, PositionRepoInterpreter}
-import fs2.{Stream, StreamApp}
 import fs2.StreamApp.ExitCode
+import fs2.{Scheduler, Stream, StreamApp}
 import org.http4s.server.blaze.BlazeBuilder
 
-object Server extends StreamApp[IO] {
-  import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext.Implicits.global
 
-  val apiV = "v1" // TODO move apiV parameter to Config
+import com.vacalendar.conf.VacalendarConfig
 
-  override def stream(args: List[String], requestShutdown: IO[Unit]): fs2.Stream[IO, StreamApp.ExitCode] =
-    createStream[IO](args, requestShutdown)
 
-  def createStream[F[_]](args: List[String], requestShutdown: F[Unit])
-                        (implicit E: Effect[F]): Stream[F, ExitCode] =
-    for {
-      conf <- Stream.eval(VacalendarConfig.load[F])
-      xa <- Stream.eval(DatabaseConfig.dbTransactor(conf.db))
-      _ <- Stream.eval(DatabaseConfig.initDb(conf.db, xa))
+object Server extends HttpServer[IO]
 
-      positionRepo = PositionRepoInterpreter[F](xa)
-      employeeRepo = EmployeeRepoInterpreter[F](xa)
-      employeeValidation = EmployeeValidationInterpreter[F](employeeRepo, positionRepo)
-      employeeService = EmployeeService[F](employeeRepo, employeeValidation)
+class HttpServer[F[_]](implicit F: Effect[F]) extends StreamApp[F] {
 
-      exitCode <- BlazeBuilder[F]
-        .bindHttp(8080, "localhost")
-        .mountService(EmployeeEndpoints.endpoints[F](employeeService), s"/$apiV/")
-        .serve
-    } yield exitCode
+  val apiV = "v1" 
+
+  override def stream(args: List[String], requestShutdown: F[Unit]): Stream[F, ExitCode] = 
+    Scheduler(corePoolSize = 2).flatMap { implicit scheduler =>
+      for {
+        conf <- Stream.eval(VacalendarConfig.load[F])
+
+        ctx = new Module[F]()
+
+        xa <- Stream.eval(ctx.dbTransactor(conf.db))
+
+        _ <- Stream.eval(ctx.migrateDb(xa))
+
+        exitCode <- BlazeBuilder[F]
+          .bindHttp(sys.env.getOrElse("PORT", "8080").toInt, "0.0.0.0")
+          .mountService(ctx.httpServices(xa), s"/$apiV/")
+          .serve
+        
+      } yield exitCode
+    }
 }
 
