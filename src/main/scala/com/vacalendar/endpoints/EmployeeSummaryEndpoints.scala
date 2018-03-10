@@ -10,7 +10,6 @@ import org.http4s.circe._
 
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.HttpService
 
 import com.vacalendar.errors._
 import com.vacalendar.service.EmployeeSummaryService
@@ -43,20 +42,19 @@ class EmployeeSummaryEndpoints[F[_]: Effect](emplSummaryService: EmployeeSummary
   object FutureVacsSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacs.since")
   object FutureVacsUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("futureVacs.until")
 
-  def service: HttpService[F] = 
+  def service: AuthedService[String, F] = 
     getEmplSummaryEndpoind <+> 
     getEmplsSummariesEndpoint
 
-  private def getEmplSummaryEndpoind: HttpService[F] = HttpService[F] {
-      case GET -> Root / "employees" / "view=summary" / LongVar(emplId) =>
-
+  private def getEmplSummaryEndpoind: AuthedService[String, F] =  AuthedService {
+      case GET -> Root / "employees" / "view=summary" / LongVar(emplId) as _ =>
         emplSummaryService.getEmplSummary(emplId).value.flatMap {
           case Right(summary) => Ok(summary.asJson)
           case Left(e) => errHandler.handle(e)
         }
     }
 
-  private def getEmplsSummariesEndpoint: HttpService[F] = HttpService[F] {
+  private def getEmplsSummariesEndpoint: AuthedService[String, F] =  AuthedService {
       case GET -> Root / "employees" / "view=summary" :?
         OrderByQueryParamMatcher(oBy) +&
         EmployeeIdQueryParamMatcher(emplId) +&
@@ -73,7 +71,7 @@ class EmployeeSummaryEndpoints[F[_]: Effect](emplSummaryService: EmployeeSummary
         PastVacsUntilQueryParamMatcher(pastVacsUntil) +&
         
         FutureVacsSinceQueryParamMatcher(futureVacsSince) +&
-        FutureVacsUntilQueryParamMatcher(futureVacsUntil) => {
+        FutureVacsUntilQueryParamMatcher(futureVacsUntil) as _ => {
 
           val result = for {
             qryParams <- EitherT.fromEither[F] {

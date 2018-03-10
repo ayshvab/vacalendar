@@ -10,7 +10,6 @@ import org.http4s.circe._
 
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.HttpService
 
 import com.vacalendar.domain._
 import com.vacalendar.errors._
@@ -27,18 +26,18 @@ class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F],
   object SinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("since")
   object UntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("until")
 
-  def service: HttpService[F] = 
+  def service: AuthedService[String, F] = 
     getEmplVacEndpoint <+>
     getEmplVacsEndpoint <+>
     deleteEmplVacEndpoint <+>
     createEmplVacEndpoint <+>
     updateEmplVacEndpoint
 
-  private def getEmplVacsEndpoint: HttpService[F] = HttpService[F] {
+  private def getEmplVacsEndpoint: AuthedService[String, F] =  AuthedService {
     case GET -> Root / "employees" / LongVar(emplId) / "vacations" :?
       OrderByQueryParamMatcher(oBy) +&
       SinceQueryParamMatcher(since) +&
-      UntilQueryParamMatcher(until) => {
+      UntilQueryParamMatcher(until) as _ => {
 
         val result = for {
         
@@ -58,26 +57,26 @@ class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F],
 
     }
 
-  private def getEmplVacEndpoint: HttpService[F] = HttpService[F] {
-    case GET -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) =>
+  private def getEmplVacEndpoint: AuthedService[String, F] =  AuthedService {
+    case GET -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) as _ =>
       vacService.getVac(emplId, vacId).value.flatMap {
         case Right(found) => Ok(found.asJson)
         case Left(e) => errHandler.handle(e)
       }
   }
 
-  private def deleteEmplVacEndpoint: HttpService[F] = HttpService[F] {
-    case DELETE -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) =>
+  private def deleteEmplVacEndpoint: AuthedService[String, F] =  AuthedService {
+    case DELETE -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) as _ =>
       vacService.deleteVac(emplId, vacId).value.flatMap {
         case Right(_) => Ok()
         case Left(e) => errHandler.handle(e)
       }
   }
 
-  private def createEmplVacEndpoint: HttpService[F] = HttpService[F] {
-    case req @ POST -> Root / "employees" / LongVar(emplId) / "vacations" =>
+  private def createEmplVacEndpoint: AuthedService[String, F] =  AuthedService {
+    case ar @ POST -> Root / "employees" / LongVar(emplId) / "vacations" as _ =>
       val action = for {
-        vacIn <- req.as[VacationIn]
+        vacIn <- ar.req.as[VacationIn]
 
         result <- vacService.createVac(emplId, vacIn).value
       } yield result
@@ -88,10 +87,10 @@ class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F],
       }
   }
 
-  private def updateEmplVacEndpoint: HttpService[F] = HttpService[F] {
-    case req @ PATCH -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) =>
+  private def updateEmplVacEndpoint: AuthedService[String, F] =  AuthedService {
+    case ar @ PATCH -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) as _ =>
       val action = for {
-        vacIn <- req.as[VacationIn]
+        vacIn <- ar.req.as[VacationIn]
         result <- vacService.updateVac(emplId, vacId, vacIn).value
       } yield  result
 

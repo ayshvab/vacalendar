@@ -95,7 +95,7 @@ class EmployeeRepoInterpreter[F[_]](val xa: Transactor[F])
       .leftMap[AppError](AppError.DbErrWrapper)
 
   def getEmpls(params: EmplsQryParams): EitherT[F, AppError, List[Employee]] = 
-    EmployeeSQL.selectEmpls(params).list
+    EmployeeSQL.selectEmpls(params).to[List]
       .transact(xa)
       .attemptT
       .leftMap[AppError](AppError.DbErrWrapper)
@@ -107,7 +107,7 @@ class EmployeeRepoInterpreter[F[_]](val xa: Transactor[F])
       .leftMap[AppError](AppError.DbErrWrapper)
 
   def getEmplsByPosId(posId: Long): EitherT[F, AppError, List[Employee]] = {
-    EmployeeSQL.selectEmplsByPosId(posId).list
+    EmployeeSQL.selectEmplsByPosId(posId).to[List]
       .transact(xa)
       .attemptT
       .leftMap[AppError](AppError.DbErrWrapper)

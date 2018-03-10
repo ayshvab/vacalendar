@@ -7,7 +7,6 @@ import cats.effect.Effect
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.http4s.circe._
-import org.http4s.HttpService
 import org.http4s.dsl.Http4sDsl
 import org.http4s._
 
@@ -27,17 +26,17 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
   object LastNameQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("lastname")
   object PositionIdQueryParamMatcher extends OptionalQueryParamDecoderMatcher[Long]("positionId")
 
-  def service: HttpService[F] = 
+  def service: AuthedService[String, F] = 
     getEmplsEndpoint <+>
     getEmplEndpoint <+>
     createEmplEndpoint <+>
     updateEmplEndpoint <+>
     deleteEmplEndpoint
 
-  private def createEmplEndpoint: HttpService[F] = HttpService[F] {
-      case req @ POST -> Root / "employees" =>
+  private def createEmplEndpoint: AuthedService[String, F] = AuthedService {
+      case ar@POST -> Root / "employees" as _ =>
         val action = for {
-          emplIn <- req.as[EmployeeIn]
+          emplIn <- ar.req.as[EmployeeIn]
           result <- emplService.createEmpl(emplIn).value
         } yield result
 
@@ -47,10 +46,10 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
         }
     }
 
-  private def updateEmplEndpoint: HttpService[F] = HttpService[F] {
-      case req @ PATCH -> Root / "employees" / LongVar(emplId) =>
+  private def updateEmplEndpoint: AuthedService[String, F] = AuthedService {
+      case ar @ PATCH -> Root / "employees" / LongVar(emplId) as _ =>
         val action = for {
-          emplIn <- req.as[EmployeeIn]
+          emplIn <- ar.req.as[EmployeeIn]
           result <- emplService.updateEmpl(emplId, emplIn).value
         } yield result
 
@@ -60,20 +59,20 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
         }
     }
 
-  private def deleteEmplEndpoint: HttpService[F] = HttpService[F] {
-      case DELETE -> Root / "employees" / LongVar(emplId) =>
+  private def deleteEmplEndpoint: AuthedService[String, F] = AuthedService {
+      case DELETE -> Root / "employees" / LongVar(emplId) as _ =>
         emplService.deleteEmpl(emplId).value.flatMap {
           case Right(_) => Ok()
           case Left(e) => errHandler.handle(e)
         }
     }
 
-  private def getEmplsEndpoint: HttpService[F] = HttpService[F] {
+  private def getEmplsEndpoint: AuthedService[String, F] = AuthedService {
       case GET -> Root / "employees" :?
         OrderByQueryParamMatcher(oBy) +&
         FirstNameQueryParamMatcher(fn) +&
         LastNameQueryParamMatcher(ln) +&
-        PositionIdQueryParamMatcher(posId) => {
+        PositionIdQueryParamMatcher(posId) as _ => {
 
           val result = for {
             qryParams <- EitherT.fromEither[F] {
@@ -91,8 +90,8 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
       }
     }
 
-  private def getEmplEndpoint: HttpService[F] = HttpService[F] {
-      case GET -> Root / "employees" / LongVar(emplId) =>
+  private def getEmplEndpoint: AuthedService[String, F] = AuthedService {
+      case GET -> Root / "employees" / LongVar(emplId) as _ =>
         emplService.getEmpl(emplId).value.flatMap {
           case Right(found) => Ok(found.asJson)
           case Left(e) => errHandler.handle(e)

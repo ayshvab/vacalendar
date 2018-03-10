@@ -19,7 +19,7 @@ class EmployeeSummaryRepoInterpreter[F[_]](val xa: Transactor[F])
     val program: ConnectionIO[EmployeeSummary] = for {
       empl <- EmployeeSQL.selectEmpl(emplId).unique
       pos <- PositionSQL.selectPos(empl.positionId).unique
-      vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).list
+      vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).to[List]
     } yield EmployeeSummary(empl, pos, vacs)
 
     program.map(Option.apply)
@@ -30,11 +30,11 @@ class EmployeeSummaryRepoInterpreter[F[_]](val xa: Transactor[F])
 
   def getEmplSummaries(qryParams: EmplSummariesQryParams = EmplSummariesQryParams()): EitherT[F, AppError, List[EmployeeSummary]] = {
     val program: ConnectionIO[List[EmployeeSummary]] = for {
-      empls <- EmployeeSQL.selectEmpls().list
+      empls <- EmployeeSQL.selectEmpls().to[List]
       emplSumrs <- empls.reverse.traverse { empl =>
         for {
           pos <- PositionSQL.selectPos(empl.positionId).unique
-          vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).list
+          vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).to[List]
         } yield EmployeeSummary(empl, pos, vacs)
       }
     } yield filterAndOrderEmplSumrs(emplSumrs, qryParams) 

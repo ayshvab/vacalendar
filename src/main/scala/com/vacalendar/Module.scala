@@ -3,7 +3,7 @@ package com.vacalendar
 import cats.effect.Effect
 import cats.implicits._
 
-import org.http4s.HttpService
+import org.http4s._
 
 import doobie.hikari.HikariTransactor
 import org.flywaydb.core.Flyway
@@ -46,7 +46,7 @@ class Module[F[_]](implicit F: Effect[F]) {
       }
     }
 
-  def httpServices(xa: HikariTransactor[F]): HttpService[F] = {
+  def httpServices(xa: HikariTransactor[F]): AuthedService[String, F] = {
 
     val emplRepo = new EmployeeRepoInterpreter[F](xa)
     val vacRepo = new VacationRepoInterpreter[F](xa)

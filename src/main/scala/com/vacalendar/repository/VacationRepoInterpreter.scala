@@ -137,13 +137,13 @@ class VacationRepoInterpreter[F[_]](val xa: Transactor[F])
       .leftMap[AppError](AppError.DbErrWrapper)
 
   def getVacs(emplId: Long, qryParams: VacsQryParams): EitherT[F, AppError, List[Vacation]] =
-    VacationSQL.selectVacs(emplId, qryParams).list
+    VacationSQL.selectVacs(emplId, qryParams).to[List]
       .transact(xa)
       .attemptT
       .leftMap[AppError](AppError.DbErrWrapper)
 
   def getEmplVacsCurrYear(emplId: Long): EitherT[F, AppError, List[Vacation]] = {
-    VacationSQL.selectEmplVacsCurrYear(emplId).list
+    VacationSQL.selectEmplVacsCurrYear(emplId).to[List]
       .transact(xa)
       .attemptT
       .leftMap[AppError](AppError.DbErrWrapper)
@@ -153,7 +153,7 @@ class VacationRepoInterpreter[F[_]](val xa: Transactor[F])
                              startVac: LocalDate,
                              endVac: LocalDate): EitherT[F, AppError, List[Vacation]] = {
     VacationSQL.selectOverlappedPosIdVacsCurrYear(posId, startVac, endVac)
-      .list
+      .to[List]
       .transact(xa)
       .attemptT
       .leftMap[AppError](AppError.DbErrWrapper)

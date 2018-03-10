@@ -8,6 +8,7 @@ import org.http4s.server.blaze.BlazeBuilder
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import com.vacalendar.conf.VacalendarConfig
+import com.vacalendar.endpoints.auth.JwtTokenAuthMiddleware
 
 
 object Server extends HttpServer[IO]
@@ -15,6 +16,8 @@ object Server extends HttpServer[IO]
 class HttpServer[F[_]](implicit F: Effect[F]) extends StreamApp[F] {
 
   val apiV = "v1" 
+
+  private lazy val ApiToken: F[Option[String]] = F.delay(sys.env.get("VACALENDAR_API_TOKEN"))
 
   override def stream(args: List[String], requestShutdown: F[Unit]): Stream[F, ExitCode] = 
     Scheduler(corePoolSize = 2).flatMap { implicit scheduler =>
@@ -27,9 +30,13 @@ class HttpServer[F[_]](implicit F: Effect[F]) extends StreamApp[F] {
 
         _ <- Stream.eval(ctx.migrateDb(xa))
 
+        apiToken <- Stream.eval(ApiToken)
+        
+        authMiddleware <- Stream.eval(JwtTokenAuthMiddleware[F](apiToken))
+
         exitCode <- BlazeBuilder[F]
           .bindHttp(sys.env.getOrElse("PORT", "8080").toInt, "0.0.0.0")
-          .mountService(ctx.httpServices(xa), s"/$apiV/")
+          .mountService(authMiddleware(ctx.httpServices(xa)), s"/$apiV/")
           .serve
         
       } yield exitCode
