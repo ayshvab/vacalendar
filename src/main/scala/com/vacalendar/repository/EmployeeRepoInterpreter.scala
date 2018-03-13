@@ -46,7 +46,7 @@ object EmployeeSQL {
     val whereLastName = params.lastName.map(s => fr"last_name like $s")
     val wherePositionId = params.positionId.map(n => fr"position_id = $n")
   
-    val defaultOrderBy: Fragment = fr"order by employee_id desc"
+    val defaultOrderBy: Fragment = fr"order by employee_id asc"
 
     val optOrderBy: Option[Fragment] = params.orderByParams map { o => 
       if (o.asc) fr"order by" ++ Fragment.const(o.field) ++ fr"asc"
