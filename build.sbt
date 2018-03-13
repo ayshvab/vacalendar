@@ -86,3 +86,6 @@ scalacOptions += "-Ypartial-unification"
 
 val badConsoleFlags = Seq("-Xfatal-warnings", "-Ywarn-unused:imports")
 scalacOptions in (Compile, console) ~= (_.filterNot(badConsoleFlags.contains(_)))
+
+
+// export SBT_OPTS="-XX:MaxMetaspaceSize=3500m -Xms1024m -Xmx3500m"

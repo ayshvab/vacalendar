@@ -38,10 +38,10 @@ class EmployeeService[F[_]: Effect](emplRepo: EmployeeRepoAlgebra[F],
 
   def createEmpl(emplIn: EmployeeIn): EitherT[F, AppError, Employee] = 
     for {
-      foundPos <- posRepo.getPos(emplIn.positionId)
+      optFoundPos <- posRepo.getPos(emplIn.positionId)
         
       validEmplIn <- EitherT.fromEither[F] {
-        validation.validateEmplIn(emplIn, foundPos)
+        validation.validateEmplIn(emplIn, optFoundPos)
           .leftMap[AppError](AppError.ServiceValidationErrsWrapper)
       }
 

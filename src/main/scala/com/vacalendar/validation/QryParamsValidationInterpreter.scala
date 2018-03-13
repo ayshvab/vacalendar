@@ -47,9 +47,9 @@ object QryParamsValidationInterpreter extends QryParamsValidationAlgebra {
   }
 
   def validateAndPrepareEmplsQryParams(oBy: Option[String],
-                                      fn: Option[String],
-                                      ln: Option[String],
-                                      posId: Option[Long]): Either[NonEmptyList[QryParamsValidationError], EmplsQryParams] = {
+                                       fn: Option[String],
+                                       ln: Option[String],
+                                       posId: Option[Long]): Either[NonEmptyList[QryParamsValidationError], EmplsQryParams] = {
 
     val result = (validateAndPrepareOrderBy(oBy, emplsOrderFieldsToDB),
                   fn.validNel[QryParamsValidationError],
