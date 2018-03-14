@@ -112,21 +112,21 @@ object QryParamsValidationInterpreter extends QryParamsValidationAlgebra {
   }
 
   def validateAndPrepareEmplSummariesQryParams(oBy: Option[String],
-                                       emplId: Option[Long],
-                                       fn: Option[String],
-                                       ln: Option[String],
-                                       posId: Option[Long],
-                                       posTitle: Option[String],
-                                       isOnVac: Option[String],
-                                       
-                                       pastVacsSince: Option[String],
-                                       pastVacsUntil: Option[String],
-                                       
-                                       currVacSince: Option[String],
-                                       currVacUntil: Option[String],
-                                       
-                                       futureVacsSince: Option[String],
-                                       futureVacsUntil: Option[String]): Either[NonEmptyList[QryParamsValidationError], EmplSummariesQryParams] = {
+                                               emplId: Option[Long],
+                                               fn: Option[String],
+                                               ln: Option[String],
+                                               posId: Option[Long],
+                                               posTitle: Option[String],
+                                               isOnVac: Option[String],
+                                               
+                                               pastVacsSince: Option[String],
+                                               pastVacsUntil: Option[String],
+                                               
+                                               currVacSince: Option[String],
+                                               currVacUntil: Option[String],
+                                               
+                                               futureVacsSince: Option[String],
+                                               futureVacsUntil: Option[String]): Either[NonEmptyList[QryParamsValidationError], EmplSummariesQryParams] = {
 
     val result = (validateAndPrepareOrderBy(oBy, sumrsOrderFieldsMap),
                   emplId.validNel[QryParamsValidationError],

@@ -11,7 +11,7 @@ import com.vacalendar.Module
 import com.vacalendar.domain._
 import com.vacalendar.errors._
 import com.vacalendar.endpoints.QryParams._
-import com.vacalendar.validation.{ ServiceValidationInterpreter,  QryParamsValidationInterpreter }
+import com.vacalendar.validation.ServiceValidationInterpreter
 import com.vacalendar.repository._
 import com.vacalendar.service.EmployeeService
 
@@ -34,7 +34,8 @@ class EmployeeServiceSpec extends WordSpec
 
     val emplRepo = new EmployeeRepoInterpreter[IO](xa)
     val posRepo = new PositionRepoInterpreter[IO](xa)
-    val emplService = new EmployeeService[IO](emplRepo, posRepo, ServiceValidationInterpreter)
+    val serviceValidation = new ServiceValidationInterpreter()
+    val emplService = new EmployeeService[IO](emplRepo, posRepo, serviceValidation)
     
     m.migrateDb(xa).unsafeRunSync()
 
@@ -58,7 +59,7 @@ class EmployeeServiceSpec extends WordSpec
           } yield {
             result shouldEqual Right(List())
           }
-          
+
         }
       }
     }
@@ -72,8 +73,7 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
           val empl1 = emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
-          
+            .unsafeRunSync()          
           val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             .unsafeRunSync()
 
@@ -95,14 +95,11 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
           val empl1 = emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
-          
+            .unsafeRunSync()          
           val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             .unsafeRunSync()
 
-          val qryParams = QryParamsValidationInterpreter
-            .validateAndPrepareEmplsQryParams(oBy = Some("positionId"), fn = None, ln = None, posId = None)
-            .right.get
+          val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = true)))
 
           for {
             result <- emplService.getEmpls(qryParams).value
@@ -120,13 +117,10 @@ class EmployeeServiceSpec extends WordSpec
 
           val empl1 = emplRepo.createEmpl(emplIn1).value.map(_.right.get)
             .unsafeRunSync()
-          
           val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             .unsafeRunSync()
 
-          val qryParams = QryParamsValidationInterpreter
-            .validateAndPrepareEmplsQryParams(oBy = Some("-positionId"), fn = None, ln = None, posId = None)
-            .right.get
+          val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = false)))
 
           for {
             result <- emplService.getEmpls(qryParams).value
@@ -148,9 +142,7 @@ class EmployeeServiceSpec extends WordSpec
           emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             .unsafeRunSync()
 
-          val qryParams = QryParamsValidationInterpreter
-            .validateAndPrepareEmplsQryParams(oBy = Some("-positionId"), fn = None, ln = None, posId = Some(1))
-            .right.get
+          val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = false)), positionId = Some(1))
 
           for {
             result <- emplService.getEmpls(qryParams).value
@@ -172,9 +164,7 @@ class EmployeeServiceSpec extends WordSpec
           emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             .unsafeRunSync()
 
-          val qryParams = QryParamsValidationInterpreter
-            .validateAndPrepareEmplsQryParams(oBy = Some("-positionId"), fn = Some("Helen"), ln = None, posId = Some(1))
-            .right.get
+          val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = false)), firstName = Some("Helen"), positionId = Some(1))
 
           for {
             result <- emplService.getEmpls(qryParams).value
@@ -183,7 +173,6 @@ class EmployeeServiceSpec extends WordSpec
           }
         }
       }
-
     }
 
   }
@@ -198,11 +187,8 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
-
-          emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
+          emplRepo.createEmpl(emplIn1).value.unsafeRunSync()
+          emplRepo.createEmpl(emplIn2).value.unsafeRunSync()
           
           for {
             result <- emplService.getEmpl(10).value
@@ -221,8 +207,7 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
+          emplRepo.createEmpl(emplIn1).value.unsafeRunSync()
 
           val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             .unsafeRunSync()

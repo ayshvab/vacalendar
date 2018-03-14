@@ -1,5 +1,6 @@
 package com.vacalendar.service
 
+import java.time.Clock
 import cats.data._
 import cats.effect.Effect
 
@@ -10,13 +11,16 @@ import com.vacalendar.repository.EmployeeSummaryRepoAlgebra
 
 class EmployeeSummaryService[F[_]: Effect](emplSummaryRepo: EmployeeSummaryRepoAlgebra[F]) {
 
-  def getEmplSummary(emplId: Long): EitherT[F, AppError, Option[EmployeeSummary]] = 
+  def getEmplSummary(emplId: Long, clock: Clock = Clock.systemUTC()): EitherT[F, AppError, EmployeeSummary] = 
     for {
-      foundEmplSummary <- emplSummaryRepo.getEmplSummary(emplId)
-    } yield foundEmplSummary
+      optEmplSummary <- emplSummaryRepo.getEmplSummary(emplId, clock)
+      emplSummary <- EitherT
+        .fromOption[F](optEmplSummary, EmplNotFound)
+        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
+    } yield emplSummary
 
-  def getEmplSummaries(qryParams: EmplSummariesQryParams): EitherT[F, AppError, List[EmployeeSummary]] = 
+  def getEmplSummaries(qryParams: EmplSummariesQryParams, clock: Clock = Clock.systemUTC()): EitherT[F, AppError, List[EmployeeSummary]] = 
     for {
-      emplSummaries <- emplSummaryRepo.getEmplSummaries(qryParams)
+      emplSummaries <- emplSummaryRepo.getEmplSummaries(qryParams, clock)
     } yield emplSummaries
 }

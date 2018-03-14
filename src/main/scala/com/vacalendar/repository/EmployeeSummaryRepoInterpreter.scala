@@ -1,6 +1,6 @@
 package com.vacalendar.repository
 
-import java.time.LocalDate
+import java.time.{ LocalDate, Clock }
 
 import cats._
 import cats.implicits._
@@ -15,27 +15,39 @@ import com.vacalendar.errors._
 class EmployeeSummaryRepoInterpreter[F[_]](val xa: Transactor[F])
                                           (implicit F: MonadError[F, Throwable]) extends EmployeeSummaryRepoAlgebra[F] {
 
-  def getEmplSummary(emplId: Long): EitherT[F, AppError, Option[EmployeeSummary]] = {
-    val program: ConnectionIO[EmployeeSummary] = for {
-      empl <- EmployeeSQL.selectEmpl(emplId).unique
-      pos <- PositionSQL.selectPos(empl.positionId).unique
-      vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).to[List]
-    } yield EmployeeSummary(empl, pos, vacs)
+  def getEmplSummary(emplId: Long, clock: Clock = Clock.systemUTC()): EitherT[F, AppError, Option[EmployeeSummary]] = {
+    // val program: ConnectionIO[EmployeeSummary] = for {
+    //   empl <- EmployeeSQL.selectEmpl(emplId).unique
+    //   pos <- PositionSQL.selectPos(empl.positionId).unique
+    //   vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).to[List]
+    // } yield EmployeeSummary(empl, pos, vacs)
 
-    program.map(Option.apply)
+    // program.map(Option.apply)
+    //   .transact(xa)
+    //   .attemptT 
+    //   .leftMap[AppError](AppError.DbErrWrapper)
+
+    val program: OptionT[ConnectionIO, EmployeeSummary] = for {
+      empl <- OptionT[ConnectionIO, Employee](EmployeeSQL.selectEmpl(emplId).option)
+      pos <- OptionT.liftF(PositionSQL.selectPos(empl.positionId).unique)
+      vacs <- OptionT.liftF(VacationSQL.selectEmplVacsCurrYear(empl.employeeId, clock).to[List])
+    } yield EmployeeSummary(empl, pos, vacs, clock)
+
+    program.value
       .transact(xa)
       .attemptT 
       .leftMap[AppError](AppError.DbErrWrapper)
   }
 
-  def getEmplSummaries(qryParams: EmplSummariesQryParams = EmplSummariesQryParams()): EitherT[F, AppError, List[EmployeeSummary]] = {
+  def getEmplSummaries(qryParams: EmplSummariesQryParams = EmplSummariesQryParams(), 
+                      clock: Clock = Clock.systemUTC()): EitherT[F, AppError, List[EmployeeSummary]] = {
     val program: ConnectionIO[List[EmployeeSummary]] = for {
       empls <- EmployeeSQL.selectEmpls().to[List]
       emplSumrs <- empls.reverse.traverse { empl =>
         for {
           pos <- PositionSQL.selectPos(empl.positionId).unique
-          vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).to[List]
-        } yield EmployeeSummary(empl, pos, vacs)
+          vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId, clock).to[List]
+        } yield EmployeeSummary(empl, pos, vacs, clock)
       }
     } yield filterAndOrderEmplSumrs(emplSumrs, qryParams) 
 

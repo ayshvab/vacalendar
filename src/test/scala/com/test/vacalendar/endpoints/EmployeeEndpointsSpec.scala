@@ -40,7 +40,10 @@ class EmployeeEndpointsSpec
 
     val emplRepo = new EmployeeRepoInterpreter[IO](xa)
     val posRepo = new PositionRepoInterpreter[IO](xa)
-    val emplService = new EmployeeService[IO](emplRepo, posRepo, ServiceValidationInterpreter)
+
+    val serviceValidation = new ServiceValidationInterpreter()
+
+    val emplService = new EmployeeService[IO](emplRepo, posRepo, serviceValidation)
     val errHandler = new EndpointErrorHandler[IO]()
     val emplEndpoints = ioMiddleware(new EmployeeEndpoints[IO](emplService, QryParamsValidationInterpreter, errHandler).service)
 

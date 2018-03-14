@@ -1,6 +1,6 @@
 package com.vacalendar.repository
 
-import java.time.Instant
+import java.time.{ Instant, Clock }
 
 import cats._
 import cats.implicits._
@@ -15,21 +15,21 @@ import com.vacalendar.errors._
 
 object EmployeeSQL {
 
-  def insertEmpl(emplIn: EmployeeIn): Query0[Employee] =
+  def insertEmpl(emplIn: EmployeeIn, clock: Clock): Query0[Employee] =
     sql"""
-      INSERT INTO employees (first_name, last_name, position_id)
-      VALUES (${emplIn.firstName}, ${emplIn.lastName}, ${emplIn.positionId})
+      INSERT INTO employees (first_name, last_name, position_id, created)
+      VALUES (${emplIn.firstName}, ${emplIn.lastName}, ${emplIn.positionId}, ${Instant.now(clock)})
       RETURNING *
     """.query[Employee]
 
-  def updateEmpl(emplId: Long, emplIn: EmployeeIn): Query0[Employee] =
+  def updateEmpl(emplId: Long, emplIn: EmployeeIn, clock: Clock): Query0[Employee] =
     sql"""
       UPDATE employees
       SET
         first_name = ${emplIn.firstName},
         last_name = ${emplIn.lastName},
         position_id = ${emplIn.positionId},
-        updated = ${Instant.now()}
+        updated = ${Instant.now(clock)}
       WHERE employee_id = $emplId
       RETURNING *
     """.query[Employee]
@@ -83,13 +83,13 @@ object EmployeeSQL {
 class EmployeeRepoInterpreter[F[_]](val xa: Transactor[F])
                                    (implicit F: MonadError[F, Throwable]) extends EmployeeRepoAlgebra[F] {
 
-  def createEmpl(emplIn: EmployeeIn): EitherT[F, AppError, Employee] =
-    EmployeeSQL.insertEmpl(emplIn).unique.transact(xa)
+  def createEmpl(emplIn: EmployeeIn, clock: Clock = Clock.systemUTC()): EitherT[F, AppError, Employee] =
+    EmployeeSQL.insertEmpl(emplIn, clock).unique.transact(xa)
       .attemptT
       .leftMap[AppError](AppError.DbErrWrapper)
 
-  def updateEmpl(emplId: Long, emplIn: EmployeeIn): EitherT[F, AppError, Option[Employee]] =
-    EmployeeSQL.updateEmpl(emplId, emplIn).option
+  def updateEmpl(emplId: Long, emplIn: EmployeeIn, clock: Clock = Clock.systemUTC()): EitherT[F, AppError, Option[Employee]] =
+    EmployeeSQL.updateEmpl(emplId, emplIn, clock).option
       .transact(xa)
       .attemptT
       .leftMap[AppError](AppError.DbErrWrapper)

@@ -1,6 +1,6 @@
 package com.vacalendar.validation
 
-import java.time.LocalDate
+import java.time.{ LocalDate, Clock }
 
 import cats.data._
 import cats.implicits._
@@ -8,7 +8,7 @@ import cats.implicits._
 import com.vacalendar.errors._
 import com.vacalendar.domain._
 
-object ServiceValidationInterpreter extends ServiceValidationAlgebra {
+class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends ServiceValidationAlgebra {
   
   type ValidationResult[A] = ValidatedNel[ServiceValidationError, A]
 
@@ -54,7 +54,7 @@ object ServiceValidationInterpreter extends ServiceValidationAlgebra {
   }
 
   private def validateVacOnlyInFuture(vacIn: VacationIn): ValidationResult[Unit] = {
-    if (vacIn.since.isAfter(LocalDate.now())) ().validNel
+    if (vacIn.since.isAfter(LocalDate.now(clock))) ().validNel
     else VacOnlyInFuture.invalidNel
   }
 
@@ -152,7 +152,7 @@ object ServiceValidationInterpreter extends ServiceValidationAlgebra {
   def checkVacIsChangeable(foundVac: Option[Vacation]): Either[ServiceValidationError, Vacation] = {    
     for {
       v <- Either.fromOption[ServiceValidationError, Vacation](foundVac, VacNotFound)
-      vac <- if (v.since.isAfter(LocalDate.now())) Either.right(v)
+      vac <- if (v.since.isAfter(LocalDate.now(clock))) Either.right(v)
              else Either.left(CannotChangeOrDeleteNotFutureVac)
     } yield vac
   }
