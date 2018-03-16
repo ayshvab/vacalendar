@@ -17,12 +17,12 @@ import com.vacalendar.service.EmployeeService
 
 
 class EmployeeServiceSpec extends WordSpec
-                         with Matchers
-                         with ForAllTestContainer {
+                            with Matchers
+                            with ForAllTestContainer {
 
   override val container = PostgreSQLContainer()
 
-  def withCtx(testThunk: (EmployeeRepoInterpreter[IO], EmployeeService[IO]) => IO[Unit]): Unit = {
+  def withCtx(testThunk: (EmployeeRepoInterpreter[IO], EmployeeService[IO]) => IO[Assertion]): Unit = {
 
     val dbConf = DatabaseConfig(driver = "org.postgresql.Driver",
                                 url = container.jdbcUrl,
@@ -59,7 +59,6 @@ class EmployeeServiceSpec extends WordSpec
           } yield {
             result shouldEqual Right(List())
           }
-
         }
       }
     }
@@ -72,12 +71,9 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          val empl1 = emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()          
-          val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
-
           for {
+            empl1 <- emplRepo.createEmpl(emplIn1).value.map(_.right.get)
+            empl2 <- emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             result <- emplService.getEmpls(EmplsQryParams()).value
           } yield {
             result shouldEqual Right(List(empl1, empl2))
@@ -94,14 +90,11 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          val empl1 = emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()          
-          val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
-
           val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = true)))
 
           for {
+            empl1 <- emplRepo.createEmpl(emplIn1).value.map(_.right.get)
+            empl2 <- emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             result <- emplService.getEmpls(qryParams).value
           } yield {
             result shouldEqual Right(List(empl1, empl2))
@@ -115,14 +108,11 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          val empl1 = emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
-          val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
-
           val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = false)))
 
           for {
+            empl1 <- emplRepo.createEmpl(emplIn1).value.map(_.right.get)
+            empl2 <- emplRepo.createEmpl(emplIn2).value.map(_.right.get)
             result <- emplService.getEmpls(qryParams).value
           } yield {
             result shouldEqual Right(List(empl2, empl1))
@@ -136,15 +126,12 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          val empl1 = emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
-          
-          emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
-
           val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = false)), positionId = Some(1))
 
           for {
+            empl1 <- emplRepo.createEmpl(emplIn1).value.map(_.right.get)
+            _ <- emplRepo.createEmpl(emplIn2).value
+
             result <- emplService.getEmpls(qryParams).value
           } yield {
             result shouldEqual Right(List(empl1))
@@ -158,15 +145,13 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
-          
-          emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
-
-          val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = false)), firstName = Some("Helen"), positionId = Some(1))
+          val qryParams = EmplsQryParams(orderByParams = Some(OrderByParams(field = "position_id", asc = false)), 
+                                         firstName = Some("Helen"), 
+                                         positionId = Some(1))
 
           for {
+            _ <- emplRepo.createEmpl(emplIn1).value
+            _ <- emplRepo.createEmpl(emplIn2).value
             result <- emplService.getEmpls(qryParams).value
           } yield {
             result shouldEqual Right(List())
@@ -187,10 +172,9 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          emplRepo.createEmpl(emplIn1).value.unsafeRunSync()
-          emplRepo.createEmpl(emplIn2).value.unsafeRunSync()
-          
           for {
+            _ <- emplRepo.createEmpl(emplIn1).value
+            _ <- emplRepo.createEmpl(emplIn2).value
             result <- emplService.getEmpl(10).value
           } yield {
             result shouldEqual Right(None)
@@ -201,18 +185,16 @@ class EmployeeServiceSpec extends WordSpec
 
     "employee with employeeId exist" should {
       
-      "return Some employee" in withCtx { 
+      "return some employee" in withCtx { 
         (emplRepo, emplService) => {
 
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
-
-          emplRepo.createEmpl(emplIn1).value.unsafeRunSync()
-
-          val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
           
           for {
+            _ <- emplRepo.createEmpl(emplIn1).value
+            empl2 <- emplRepo.createEmpl(emplIn2).value.map(_.right.get)
+
             result <- emplService.getEmpl(2).value
           } yield {
             result shouldEqual Right(Some(empl2))
@@ -231,11 +213,9 @@ class EmployeeServiceSpec extends WordSpec
         (emplRepo, emplService) => {
 
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
-
-          emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
           
           for {
+            _ <- emplRepo.createEmpl(emplIn1).value
             result <- emplService.deleteEmpl(10).value
           } yield {
             result shouldEqual Left(AppError.ServiceValidationErrWrapper(EmplNotFound))
@@ -252,15 +232,12 @@ class EmployeeServiceSpec extends WordSpec
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Jack", lastName = "Holmes", positionId = 2)
 
-          emplRepo.createEmpl(emplIn1).value.map(_.right.get)
-            .unsafeRunSync()
-
-          val empl2 = emplRepo.createEmpl(emplIn2).value.map(_.right.get)
-            .unsafeRunSync()
-          
           for {
-            deleted <- emplService.deleteEmpl(2).value
-            optFound <- emplRepo.getEmpl(2).value
+            _ <- emplRepo.createEmpl(emplIn1).value
+            empl2 <- emplRepo.createEmpl(emplIn2).value.map(_.right.get)
+
+            deleted <- emplService.deleteEmpl(empl2.employeeId).value
+            optFound <- emplRepo.getEmpl(empl2.employeeId).value
           } yield {
             deleted shouldEqual Right(empl2)
             optFound shouldEqual Right(None)
@@ -279,12 +256,10 @@ class EmployeeServiceSpec extends WordSpec
         (emplRepo, emplService) => {
 
           val emplIn = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
-
-          val empl = emplService.createEmpl(emplIn).value.map(_.right.get)
-            .unsafeRunSync()
-          
+      
           for {
-            result <- emplRepo.getEmpl(1).value
+            empl <- emplService.createEmpl(emplIn).value.map(_.right.get)
+            result <- emplRepo.getEmpl(empl.employeeId).value
           } yield {
             result shouldEqual Right(Some(empl))
           }
@@ -298,11 +273,9 @@ class EmployeeServiceSpec extends WordSpec
         (emplRepo, emplService) => {
 
           val emplIn = EmployeeIn(firstName = "John@#", lastName = "Doe999", positionId = 10)
-
-          val errors = emplService.createEmpl(emplIn).value.map(_.left.get)
-            .unsafeRunSync()
           
           for {
+            errors <- emplService.createEmpl(emplIn).value.map(_.left.get)
             result <- emplRepo.getEmpl(1).value
           } yield {
             result shouldEqual Right(None)
@@ -311,6 +284,23 @@ class EmployeeServiceSpec extends WordSpec
                 FirstNameHasSpecialCharacters("John@#"), 
                 List(LastNameHasSpecialCharacters("Doe999"), PosNotFound)))
           }
+        }
+      }
+    }
+
+    "employee input has valid data" should {
+
+      "create employee" in withCtx {
+        (emplRepo, emplService) => {
+
+          val emplIn = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
+          
+          for {
+            empl <- emplService.createEmpl(emplIn).value.map(_.right.get)
+            result <- emplRepo.getEmpl(empl.employeeId).value.map(_.right.get)
+          } yield {
+            result shouldEqual Some(empl)
+          }          
         }
       }
     }
@@ -326,19 +316,14 @@ class EmployeeServiceSpec extends WordSpec
         (emplRepo, emplService) => {
 
           val emplInForCreate = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
-
-          val empl = emplService.createEmpl(emplInForCreate).value.map(_.right.get)
-            .unsafeRunSync()
-
           val emplInUpdate = EmployeeIn(firstName = "John", lastName = "Wayne", positionId = 1)
 
-          val updated = emplService.updateEmpl(empl.employeeId, emplInUpdate).value.map(_.right.get)
-            .unsafeRunSync()
-
           for {
-            result <- emplRepo.getEmpl(updated.employeeId).value
+            empl <- emplService.createEmpl(emplInForCreate).value.map(_.right.get)
+            updated <- emplService.updateEmpl(empl.employeeId, emplInUpdate).value.map(_.right.get)
+            result <- emplRepo.getEmpl(updated.employeeId).value.map(_.right.get)
           } yield {
-            result shouldEqual Right(Some(updated))
+            result shouldEqual Some(updated)
           }
         }
       }
@@ -350,19 +335,15 @@ class EmployeeServiceSpec extends WordSpec
         (emplRepo, emplService) => {
 
           val emplInForCreate = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
-
-          val empl = emplService.createEmpl(emplInForCreate).value.map(_.right.get)
-            .unsafeRunSync()
-
           val invalidEmplInUpdate = EmployeeIn(firstName = "John", lastName = "Wayne1", positionId = 10)
 
-          val errors = emplService.updateEmpl(empl.employeeId, invalidEmplInUpdate).value.map(_.left.get)
-            .unsafeRunSync()
-
           for {
-            oldEmpl <- emplRepo.getEmpl(empl.employeeId).value
+            empl <- emplService.createEmpl(emplInForCreate).value.map(_.right.get)
+            errors <- emplService.updateEmpl(empl.employeeId, invalidEmplInUpdate).value.map(_.left.get)
+            oldEmpl <- emplRepo.getEmpl(empl.employeeId).value.map(_.right.get)
           } yield {
-            Right(Some(empl)) shouldEqual oldEmpl
+            Some(empl) shouldEqual oldEmpl
+
             errors shouldEqual AppError.ServiceValidationErrsWrapper(
               NonEmptyList(
                 LastNameHasSpecialCharacters("Wayne1"), List(PosNotFound)))
@@ -382,6 +363,25 @@ class EmployeeServiceSpec extends WordSpec
             error <- emplService.updateEmpl(1, validEmplInUpdate).value
           } yield {
             error shouldEqual Left(AppError.ServiceValidationErrWrapper(EmplNotFound))
+          }          
+        }
+      }
+    }
+
+    "employee input has valid data" should {
+
+      "update employee" in withCtx {
+        (emplRepo, emplService) => {
+
+          val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
+          val emplIn2 = EmployeeIn(firstName = "John", lastName = "Wayne", positionId = 1)
+
+          for {
+            empl <- emplService.createEmpl(emplIn1).value.map(_.right.get)
+            updated <- emplService.updateEmpl(empl.employeeId, emplIn2).value.map(_.right.get)
+            result <- emplRepo.getEmpl(empl.employeeId).value.map(_.right.get)
+          } yield {
+            result shouldEqual Some(updated)
           }          
         }
       }

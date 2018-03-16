@@ -21,10 +21,10 @@ class EmployeeSummaryServiceSpec extends WordSpec
 
   override val container = PostgreSQLContainer()
 
-  def withCtx(testThunk: (EmployeeRepoInterpreter[IO], 
-                          VacationRepoInterpreter[IO], 
-                          EmployeeSummaryRepoInterpreter[IO], 
-                          EmployeeSummaryService[IO]) => IO[Unit]): Unit = {
+  def withCtx(testThunk: (EmployeeRepoInterpreter[IO],
+                          VacationRepoInterpreter[IO],
+                          EmployeeSummaryRepoInterpreter[IO],
+                          EmployeeSummaryService[IO]) => IO[Assertion]): Unit = {
 
     val dbConf = DatabaseConfig(driver = "org.postgresql.Driver",
                                 url = container.jdbcUrl,
@@ -90,14 +90,14 @@ class EmployeeSummaryServiceSpec extends WordSpec
 
           val clockOfVacsCreation = Clock.fixed(LocalDate.of(2018, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
-          val currVac = vacRepo.createVac(emplId, currVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val pastVac = vacRepo.createVac(emplId, pastVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val futureVac = vacRepo.createVac(emplId, futureVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-
           for {
+            currVac <- vacRepo.createVac(emplId, currVacIn, clockOfVacsCreation)
+              .value.map(_.right.get)
+            pastVac <- vacRepo.createVac(emplId, pastVacIn, clockOfVacsCreation)
+              .value.map(_.right.get)
+            futureVac <- vacRepo.createVac(emplId, futureVacIn, clockOfVacsCreation)
+              .value.map(_.right.get)
+
             result <- emplSummaryService.getEmplSummary(emplId, clock).value
             summary = result.right.get
           } yield {
@@ -118,18 +118,14 @@ class EmployeeSummaryServiceSpec extends WordSpec
   }
 
   "Get employee summaries by query params" when {
-    
+
     "with empty qryParams and prepared db" should {
       "return list of employee summaries in default order" in withCtx {
         (emplRepo, vacRepo, emplSummaryRepo, emplSummaryService) => {
           val emplId1: Long = 1
           val emplId2: Long = 2
-
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Peter", lastName = "Parker", positionId = 1)
-
-          emplRepo.createEmpl(emplIn1).value.unsafeRunSync()
-          emplRepo.createEmpl(emplIn2).value.unsafeRunSync()
 
           val clock = Clock.fixed(LocalDate.of(2018, 5, 1).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
@@ -155,21 +151,24 @@ class EmployeeSummaryServiceSpec extends WordSpec
 
           val clockOfVacsCreation = Clock.fixed(LocalDate.of(2018, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
-          val empl1CurrVac = vacRepo.createVac(emplId1, empl1CurrVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl1PastVac = vacRepo.createVac(emplId1, empl1PastVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl1FutureVac = vacRepo.createVac(emplId1, empl1FutureVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-
-          val empl2PastVac1 = vacRepo.createVac(emplId2, empl2PastVacIn1, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl2PastVac2 = vacRepo.createVac(emplId2, empl2PastVacIn2, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl2FutureVac = vacRepo.createVac(emplId2, empl2FutureVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-
           for {
+            _ <- emplRepo.createEmpl(emplIn1).value
+            _ <- emplRepo.createEmpl(emplIn2).value
+
+            empl1CurrVac <- vacRepo.createVac(emplId1, empl1CurrVacIn, clockOfVacsCreation)
+              .value.map(_.right.get)
+            empl1PastVac <- vacRepo.createVac(emplId1, empl1PastVacIn, clockOfVacsCreation)
+              .value.map(_.right.get)
+            empl1FutureVac <- vacRepo.createVac(emplId1, empl1FutureVacIn, clockOfVacsCreation)
+              .value.map(_.right.get)
+
+            empl2PastVac1 <- vacRepo.createVac(emplId2, empl2PastVacIn1, clockOfVacsCreation)
+              .value.map(_.right.get)
+            empl2PastVac2 <- vacRepo.createVac(emplId2, empl2PastVacIn2, clockOfVacsCreation)
+              .value.map(_.right.get)
+            empl2FutureVac <- vacRepo.createVac(emplId2, empl2FutureVacIn, clockOfVacsCreation)
+              .value.map(_.right.get)
+
             result <- emplSummaryService.getEmplSummaries(EmplSummariesQryParams(), clock).value
             summaries = result.right.get
             expected1 = EmployeeSummary(employeeId = emplId1,
@@ -197,7 +196,7 @@ class EmployeeSummaryServiceSpec extends WordSpec
             summaries shouldEqual List(expected1, expected2)
           }
         }
-      }        
+      }
     }
 
     "with qryParams and prepared db" should {
@@ -206,21 +205,17 @@ class EmployeeSummaryServiceSpec extends WordSpec
           val emplId1: Long = 1
           val emplId2: Long = 2
           val emplId3: Long = 3
-          
+
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Peter", lastName = "Parker", positionId = 1)
           val emplIn3 = EmployeeIn(firstName = "Montgomery", lastName = "Montgomery", positionId = 2)
-
-          emplRepo.createEmpl(emplIn1).value.unsafeRunSync()
-          emplRepo.createEmpl(emplIn2).value.unsafeRunSync()
-          emplRepo.createEmpl(emplIn3).value.unsafeRunSync()
 
           val clock = Clock.fixed(LocalDate.of(2018, 5, 1).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
           val empl1CurrVacIn = VacationIn(since = LocalDate.now(clock), until = LocalDate.now(clock).plusDays(5))
           val empl1PastVacIn = VacationIn(since = LocalDate.of(2018, 2, 1), until = LocalDate.of(2018, 2, 8))
           val empl1FutureVacIn = VacationIn(since = LocalDate.of(2018, 8, 1), until = LocalDate.of(2018, 8, 10))
-          
+
           val empl2PastVacIn1 = VacationIn(since = LocalDate.of(2018, 4, 1), until = LocalDate.of(2018, 4, 6))
           val empl2PastVacIn1Days = empl2PastVacIn1.until.toEpochDay - empl2PastVacIn1.since.toEpochDay
           val empl2PastVacIn2 = VacationIn(since = LocalDate.of(2018, 3, 1), until = LocalDate.of(2018, 3, 10))
@@ -233,26 +228,24 @@ class EmployeeSummaryServiceSpec extends WordSpec
 
           val clockOfVacsCreation = Clock.fixed(LocalDate.of(2018, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
-          vacRepo.createVac(emplId1, empl1CurrVacIn, clockOfVacsCreation)
-            .value.unsafeRunSync()
-          vacRepo.createVac(emplId1, empl1PastVacIn, clockOfVacsCreation)
-            .value.unsafeRunSync()
-          vacRepo.createVac(emplId1, empl1FutureVacIn, clockOfVacsCreation)
-            .value.unsafeRunSync()
-
-          val empl2PastVac1 = vacRepo.createVac(emplId2, empl2PastVacIn1, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl2PastVac2 = vacRepo.createVac(emplId2, empl2PastVacIn2, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl2FutureVac = vacRepo.createVac(emplId2, empl2FutureVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-
           val qryParams = EmplSummariesQryParams(orderByParams = Some(OrderByParams(field = "remainedVacationDays", asc = true)),
                                                  isOnVac = Some(false))
 
           for {
-            result <- emplSummaryService.getEmplSummaries(qryParams, clock).value
-            summaries = result.right.get
+            _ <- emplRepo.createEmpl(emplIn1).value
+            _ <- emplRepo.createEmpl(emplIn2).value
+            _ <- emplRepo.createEmpl(emplIn3).value
+
+            _ <- vacRepo.createVac(emplId1, empl1CurrVacIn, clockOfVacsCreation).value
+            _ <- vacRepo.createVac(emplId1, empl1PastVacIn, clockOfVacsCreation).value
+            _ <- vacRepo.createVac(emplId1, empl1FutureVacIn, clockOfVacsCreation).value
+
+            empl2PastVac1 <- vacRepo.createVac(emplId2, empl2PastVacIn1, clockOfVacsCreation).value.map(_.right.get)
+            empl2PastVac2 <- vacRepo.createVac(emplId2, empl2PastVacIn2, clockOfVacsCreation).value.map(_.right.get)
+            empl2FutureVac <- vacRepo.createVac(emplId2, empl2FutureVacIn, clockOfVacsCreation).value.map(_.right.get)
+
+            summaries <- emplSummaryService.getEmplSummaries(qryParams, clock).value
+              .map(_.right.get)
             expected1 = EmployeeSummary(employeeId = emplId2,
                                         firstName = emplIn2.firstName,
                                         lastName = emplIn2.lastName,
@@ -278,21 +271,16 @@ class EmployeeSummaryServiceSpec extends WordSpec
             summaries shouldEqual List(expected1, expected2)
           }
         }
-      }        
-    }
+      }
 
-    "return ordered and filterd list of employee summaries 2" in withCtx {
+      "return ordered and filterd list of employee summaries 2" in withCtx {
         (emplRepo, vacRepo, emplSummaryRepo, emplSummaryService) => {
           val emplId1: Long = 1
           val emplId2: Long = 2
-          
+
           val emplIn1 = EmployeeIn(firstName = "John", lastName = "Doe", positionId = 1)
           val emplIn2 = EmployeeIn(firstName = "Peter", lastName = "Parker", positionId = 1)
           val emplIn3 = EmployeeIn(firstName = "Montgomery", lastName = "Montgomery", positionId = 2)
-
-          emplRepo.createEmpl(emplIn1).value.unsafeRunSync()
-          emplRepo.createEmpl(emplIn2).value.unsafeRunSync()
-          emplRepo.createEmpl(emplIn3).value.unsafeRunSync()
 
           val clock = Clock.fixed(LocalDate.of(2018, 5, 1).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
 
@@ -302,35 +290,34 @@ class EmployeeSummaryServiceSpec extends WordSpec
           val empl1PastVacInDays = empl1PastVacIn.until.toEpochDay - empl1PastVacIn.since.toEpochDay
           val empl1FutureVacIn = VacationIn(since = LocalDate.of(2018, 8, 1), until = LocalDate.of(2018, 8, 10))
           val empl1FutureVacInDays = empl1FutureVacIn.until.toEpochDay - empl1FutureVacIn.since.toEpochDay
-          
+
           val empl1RemainedVacationDaysCount = ValidationRules
             .vacDaysMaxCountPerYear - (empl1PastVacInDays + empl1CurrVacInDays + empl1FutureVacInDays)
-          
+
           val empl2PastVacIn1 = VacationIn(since = LocalDate.of(2018, 4, 1), until = LocalDate.of(2018, 4, 6))
           val empl2PastVacIn2 = VacationIn(since = LocalDate.of(2018, 3, 1), until = LocalDate.of(2018, 3, 10))
           val empl2FutureVacIn = VacationIn(since = LocalDate.of(2018, 9, 1), until = LocalDate.of(2018, 9, 10))
-          
+
           val clockOfVacsCreation = Clock.fixed(LocalDate.of(2018, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
-
-          val empl1CurrVac = vacRepo.createVac(emplId1, empl1CurrVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl1PastVac = vacRepo.createVac(emplId1, empl1PastVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-          val empl1FutureVac = vacRepo.createVac(emplId1, empl1FutureVacIn, clockOfVacsCreation)
-            .value.map(_.right.get).unsafeRunSync()
-
-          vacRepo.createVac(emplId2, empl2PastVacIn1, clockOfVacsCreation)
-            .value.unsafeRunSync()
-          vacRepo.createVac(emplId2, empl2PastVacIn2, clockOfVacsCreation)
-            .value.unsafeRunSync()
-          vacRepo.createVac(emplId2, empl2FutureVacIn, clockOfVacsCreation)
-            .value.unsafeRunSync()
 
           val qryParams = EmplSummariesQryParams(orderByParams = Some(OrderByParams(field = "remainedVacationDays", asc = false)),
                                                  pastVacsSince = Some(DateParams(before = Some(LocalDate.of(2018, 6, 1)), after = Some(LocalDate.of(2018, 1, 31)))),
                                                  futureVacsUntil = Some(DateParams(exact = Some(LocalDate.of(2018, 8, 10)))))
 
           for {
+
+            _ <- emplRepo.createEmpl(emplIn1).value
+            _ <- emplRepo.createEmpl(emplIn2).value
+            _ <- emplRepo.createEmpl(emplIn3).value
+
+            empl1CurrVac <- vacRepo.createVac(emplId1, empl1CurrVacIn, clockOfVacsCreation).value.map(_.right.get)
+            empl1PastVac <- vacRepo.createVac(emplId1, empl1PastVacIn, clockOfVacsCreation).value.map(_.right.get)
+            empl1FutureVac <- vacRepo.createVac(emplId1, empl1FutureVacIn, clockOfVacsCreation).value.map(_.right.get)
+
+            _ <- vacRepo.createVac(emplId2, empl2PastVacIn1, clockOfVacsCreation).value
+            _ <- vacRepo.createVac(emplId2, empl2PastVacIn2, clockOfVacsCreation).value
+            _ <- vacRepo.createVac(emplId2, empl2FutureVacIn, clockOfVacsCreation).value
+
             result <- emplSummaryService.getEmplSummaries(qryParams, clock).value
             summaries = result.right.get
             expected = EmployeeSummary(employeeId = emplId1,
@@ -343,12 +330,14 @@ class EmployeeSummaryServiceSpec extends WordSpec
                                        pastVacations = List(empl1PastVac),
                                        currentVacation = Some(empl1CurrVac),
                                        futureVacations = List(empl1FutureVac))
-          
+
           } yield {
             summaries shouldEqual List(expected)
           }
         }
-      }        
-    }
+      }
 
+    }
+    
+  }
 }
