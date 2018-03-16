@@ -46,8 +46,8 @@ case object VacNotFound extends ServiceValidationError {
   val message = s"Vacation not found"
 }
 
-case object VacSinceDateMustBeforeUntilDate extends ServiceValidationError {
-  val code = "VacSinceDateMustBeforeUntilDate"
+case object VacSinceDateMustBeBeforeUntilDate extends ServiceValidationError {
+  val code = "VacSinceDateMustBeBeforeUntilDate"
   val message = "Since date must be before until date"
 }
 

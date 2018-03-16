@@ -16,18 +16,16 @@ class VacationService[F[_]: Effect](vacRepo: VacationRepoAlgebra[F],
   
   def getVac(emplId: Long, vacId: Long): EitherT[F, AppError, Option[Vacation]] =
     for {
-      optVac <- vacRepo.getVac(emplId, vacId)
-        
+      optVac <- vacRepo.getVac(emplId, vacId)  
     } yield optVac
 
   def getVacs(emplId: Long, qryParams: VacsQryParams): EitherT[F, AppError, List[Vacation]] =
     for {
-      foundEmpl <- emplRepo.getEmpl(emplId)
-        
-      _ <- EitherT.fromEither[F] {
-        V.checkEmplExist(foundEmpl)
+      optFoundEmpl <- emplRepo.getEmpl(emplId)
+
+      _ <- EitherT
+        .fromOption[F](optFoundEmpl, EmplNotFound)
         .leftMap[AppError](AppError.ServiceValidationErrWrapper)
-      }
 
       vacs <- vacRepo.getVacs(emplId, qryParams)
 
@@ -35,10 +33,13 @@ class VacationService[F[_]: Effect](vacRepo: VacationRepoAlgebra[F],
 
   def deleteVac(emplId: Long, vacId: Long): EitherT[F, AppError, Vacation] = {
     for {
-      foundVac <- vacRepo.getVac(emplId, vacId)
+      optVac <- vacRepo.getVac(emplId, vacId)      
+      vac <- EitherT
+        .fromOption[F](optVac, VacNotFound)
+        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
         
-      vac <- EitherT.fromEither[F] { 
-        V.checkVacIsChangeable(foundVac)
+      _ <- EitherT.fromEither[F] { 
+        V.checkVacIsChangeable(vac)
           .leftMap[AppError](AppError.ServiceValidationErrWrapper)
       }
 
@@ -53,26 +54,26 @@ class VacationService[F[_]: Effect](vacRepo: VacationRepoAlgebra[F],
 
   def createVac(emplId: Long, vacIn: VacationIn): EitherT[F, AppError, Vacation] = {
     for {
-      foundEmpl <- emplRepo.getEmpl(emplId)
-      
-      empl <- EitherT.fromEither[F] {
-        V.checkEmplExist(foundEmpl)
-          .leftMap[AppError](AppError.ServiceValidationErrWrapper)
-      }
+      optFoundEmpl <- emplRepo.getEmpl(emplId)      
+
+      empl <- EitherT
+        .fromOption[F](optFoundEmpl, EmplNotFound)
+        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
 
       validVacIn1 <- EitherT.fromEither[F] {
         V.basicValidateVacIn(vacIn)
           .leftMap[AppError](AppError.ServiceValidationErrsWrapper)
       }
 
-      emplVacsCurrYear <- vacRepo.getEmplVacsCurrYear(empl.employeeId)
+      emplVacsCurrYear <- vacRepo.getEmplVacsCurrYear(emplId)
         
       overlappedVacsWithSamePosId <- vacRepo.getOverlappedPosIdVacs(empl.positionId, vacIn.since, vacIn.until)
         
       emplsWithSamePosId <- emplRepo.getEmplsByPosId(empl.positionId)
         
       validVacIn2 <- EitherT.fromEither[F] {
-        V.validateVacInCreate(validVacIn1, 
+        V.validateVacInCreate(validVacIn1,
+                              emplId,
                               emplVacsCurrYear, 
                               overlappedVacsWithSamePosId, 
                               emplsWithSamePosId)
@@ -86,21 +87,22 @@ class VacationService[F[_]: Effect](vacRepo: VacationRepoAlgebra[F],
 
   def updateVac(emplId: Long, vacId: Long, vacIn: VacationIn): EitherT[F, AppError, Vacation] = {
     for {
-      
-      foundVac <- vacRepo.getVac(emplId, vacId)
-        
-      vac <- EitherT.fromEither[F] {
-        V.checkVacIsChangeable(foundVac)
-        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
-      }
-      
-      foundEmpl <- emplRepo.getEmpl(emplId)
-        
-      empl <- EitherT.fromEither[F] {
-        V.checkEmplExist(foundEmpl)
-        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
-      }
 
+      optFoundEmpl <- emplRepo.getEmpl(emplId)
+      empl <- EitherT
+        .fromOption[F](optFoundEmpl, EmplNotFound)
+        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
+      
+      optVac <- vacRepo.getVac(emplId, vacId)      
+      vac <- EitherT
+        .fromOption[F](optVac, VacNotFound)
+        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
+      
+      _ <- EitherT.fromEither[F] {
+        V.checkVacIsChangeable(vac)
+        .leftMap[AppError](AppError.ServiceValidationErrWrapper)
+      }
+        
       validVacIn1 <- EitherT.fromEither[F] { 
         V.basicValidateVacIn(vacIn)
         .leftMap[AppError](AppError.ServiceValidationErrsWrapper)
@@ -115,10 +117,11 @@ class VacationService[F[_]: Effect](vacRepo: VacationRepoAlgebra[F],
         
       validVacIn2 <- EitherT.fromEither[F] { 
         V.validateVacInUpdate(validVacIn1,
-                               vacId,
-                               emplVacsCurrYear, 
-                               overlappedVacsWithSamePosId, 
-                               emplsWithSamePosId)
+                              emplId,
+                              vacId,
+                              emplVacsCurrYear, 
+                              overlappedVacsWithSamePosId, 
+                              emplsWithSamePosId)
         .leftMap[AppError](AppError.ServiceValidationErrsWrapper)
       }
       

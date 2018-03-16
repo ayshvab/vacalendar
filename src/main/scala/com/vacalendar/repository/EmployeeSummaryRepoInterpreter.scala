@@ -16,17 +16,6 @@ class EmployeeSummaryRepoInterpreter[F[_]](val xa: Transactor[F])
                                           (implicit F: MonadError[F, Throwable]) extends EmployeeSummaryRepoAlgebra[F] {
 
   def getEmplSummary(emplId: Long, clock: Clock = Clock.systemUTC()): EitherT[F, AppError, Option[EmployeeSummary]] = {
-    // val program: ConnectionIO[EmployeeSummary] = for {
-    //   empl <- EmployeeSQL.selectEmpl(emplId).unique
-    //   pos <- PositionSQL.selectPos(empl.positionId).unique
-    //   vacs <- VacationSQL.selectEmplVacsCurrYear(empl.employeeId).to[List]
-    // } yield EmployeeSummary(empl, pos, vacs)
-
-    // program.map(Option.apply)
-    //   .transact(xa)
-    //   .attemptT 
-    //   .leftMap[AppError](AppError.DbErrWrapper)
-
     val program: OptionT[ConnectionIO, EmployeeSummary] = for {
       empl <- OptionT[ConnectionIO, Employee](EmployeeSQL.selectEmpl(emplId).option)
       pos <- OptionT.liftF(PositionSQL.selectPos(empl.positionId).unique)

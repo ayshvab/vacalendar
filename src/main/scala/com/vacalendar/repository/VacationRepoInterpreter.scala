@@ -33,7 +33,7 @@ object VacationSQL {
     val whereUntil = qryParams.until.flatMap(_.exact.map(ld => fr"until = $ld"))
     val whereUntilAfter = qryParams.until.flatMap(_.after.map(ld => fr"until > $ld"))
 
-    val defaultOrderBy: Fragment = fr"order by vacation_id desc"
+    val defaultOrderBy: Fragment = fr"order by vacation_id asc"
 
     val optOrderBy: Option[Fragment] = qryParams.orderByParams map { o => 
       if (o.asc) fr"order by" ++ Fragment.const(o.field) ++ fr"asc"

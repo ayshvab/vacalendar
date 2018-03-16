@@ -35,20 +35,20 @@ class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends Ser
 
   private def validateVacDirection(vacIn: VacationIn): ValidationResult[Unit] =
     if (vacIn.since.isBefore(vacIn.until)) ().validNel
-    else VacSinceDateMustBeforeUntilDate.invalidNel
+    else VacSinceDateMustBeBeforeUntilDate.invalidNel
 
   private def validateVacPeriodWithin1Year(vacIn: VacationIn): ValidationResult[Unit] =
     if (vacIn.since.getYear == vacIn.until.getYear) ().validNel
     else VacMustStartAndEndWithin1Year.invalidNel
 
   private def validateMinVacPeriod(vacIn: VacationIn): ValidationResult[Unit] = {
-    val vacPeriod = vacIn.until.toEpochDay - vacIn.since.toEpochDay
+    val vacPeriod = Math.abs(vacIn.until.toEpochDay - vacIn.since.toEpochDay)
     if (vacPeriod < ValidationRules.minVacPeriod) VacPeriodIsLessMin.invalidNel
     else ().validNel
   }
 
   private def validateMaxVacPeriod(vacIn: VacationIn): ValidationResult[Unit] = {
-    val vacPeriod = vacIn.until.toEpochDay - vacIn.since.toEpochDay
+    val vacPeriod = Math.abs(vacIn.until.toEpochDay - vacIn.since.toEpochDay)
     if (vacPeriod > ValidationRules.maxVacPeriod) VacPeriodIsMoreMax.invalidNel
     else ().validNel
   }
@@ -113,15 +113,20 @@ class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends Ser
     ).tupled.map(_ => vacIn).toEither
   }
 
-  def validateVacInCreate(vacIn: VacationIn, 
+  def validateVacInCreate(vacIn: VacationIn,
+                          emplId: Long,
                           emplVacsCurrYear: List[Vacation],
                           overlappedVacsWithSamePosId: List[Vacation],
                           emplsWithSamePosId: List[Employee]): Either[NonEmptyList[ServiceValidationError], VacationIn] = {
     
-    val emplsOnVacWithSamePosIdCount = overlappedVacsWithSamePosId.groupBy(_.employeeId).size + 1
+    val emplsOnVacWithSamePosIdCount = overlappedVacsWithSamePosId
+      .filter(_.employeeId != emplId)
+      .groupBy(_.employeeId).size + 1
+
     val emplsWithSamePosIdCount = emplsWithSamePosId.length
 
-    (validateVacNotOverlap(vacIn, emplVacsCurrYear),
+    (
+     validateVacNotOverlap(vacIn, emplVacsCurrYear),
      validatePeriodFromLastVac(vacIn, emplVacsCurrYear), 
      validatePeriodToNextVac(vacIn, emplVacsCurrYear),
      validateVacDaysTotalCountPerYear(vacIn, emplVacsCurrYear),
@@ -130,18 +135,22 @@ class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends Ser
   }
 
   def validateVacInUpdate(vacIn: VacationIn,
+                          emplId: Long,
                           vacId: Long,
                           emplVacsCurrYear: List[Vacation],
                           overlappedVacsWithSamePosId: List[Vacation],
                           emplsWithSamePosId: List[Employee]): Either[NonEmptyList[ServiceValidationError], VacationIn] = {
 
     val emplVacsCurrYearExcludeUpdVac = emplVacsCurrYear.filter(_.vacationId != vacId)
-    val overlappedVacsWithSamePosIdExcludeUpdVac = overlappedVacsWithSamePosId.filter(_.vacationId != vacId)
 
-    val emplsOnVacWithSamePosIdCount = overlappedVacsWithSamePosIdExcludeUpdVac.groupBy(_.employeeId).size + 1
+    val emplsOnVacWithSamePosIdCount = overlappedVacsWithSamePosId
+      .filter(v => v.vacationId != vacId && v.employeeId != emplId)
+      .groupBy(_.employeeId).size + 1
+    
     val emplsWithSamePosIdCount = emplsWithSamePosId.length
     
-    (validateVacNotOverlap(vacIn, emplVacsCurrYearExcludeUpdVac),
+    (
+     validateVacNotOverlap(vacIn, emplVacsCurrYearExcludeUpdVac),
      validatePeriodFromLastVac(vacIn, emplVacsCurrYearExcludeUpdVac), 
      validatePeriodToNextVac(vacIn, emplVacsCurrYearExcludeUpdVac),
      validateVacDaysTotalCountPerYear(vacIn, emplVacsCurrYearExcludeUpdVac),
@@ -149,18 +158,10 @@ class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends Ser
     ).tupled.map(_ => vacIn).toEither
   }
 
-  def checkVacIsChangeable(foundVac: Option[Vacation]): Either[ServiceValidationError, Vacation] = {    
-    for {
-      v <- Either.fromOption[ServiceValidationError, Vacation](foundVac, VacNotFound)
-      vac <- if (v.since.isAfter(LocalDate.now(clock))) Either.right(v)
-             else Either.left(CannotChangeOrDeleteNotFutureVac)
-    } yield vac
-  }
-
-  def checkEmplExist(foundEmpl: Option[Employee]): Either[ServiceValidationError, Employee] = {
-    Either.fromOption[ServiceValidationError, Employee](foundEmpl, EmplNotFound)
-  }
-
+  def checkVacIsChangeable(vac: Vacation): Either[ServiceValidationError, Vacation] = 
+    if (vac.since.isAfter(LocalDate.now(clock))) Either.right(vac)
+    else Either.left(CannotChangeOrDeleteNotFutureVac)
+  
   def validateEmplIn(emplIn: EmployeeIn, foundPos: Option[Position]): Either[NonEmptyList[ServiceValidationError], EmployeeIn] = {
     (validateFirstName(emplIn.firstName), 
      validateLastName(emplIn.lastName), 
