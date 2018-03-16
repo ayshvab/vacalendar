@@ -106,8 +106,8 @@ case class NotValidQueryParam(value: String) extends QryParamsValidationError {
   val message = s"Not valid query param value: $value"
 }
 
-case object NotValidLocalDateString extends QryParamsValidationError {
-  val code = "NotValidLocalDateString"
-  val message = s"Not valid date string"
+case class NotValidLocalDateStringParam(value: String) extends QryParamsValidationError {
+  val code = "NotValidLocalDateStringParam"
+  val message = s"Not valid date string param: $value"
 }
 

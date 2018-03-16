@@ -67,11 +67,11 @@ object QryParamsValidationInterpreter extends QryParamsValidationAlgebra {
       case None => None.validNel
       case Some("_.._") => None.validNel
       case Some(s) if (s.startsWith(prefix)) => Either.catchNonFatal(LocalDate.parse(s.stripPrefix(prefix))) match {
-        case Left(_) => NotValidLocalDateString.invalidNel
+        case Left(_) => NotValidLocalDateStringParam(s).invalidNel
         case Right(b@_) => Some(DateParams(before = Some(b))).validNel
       }
       case Some(s) if (s.endsWith(suffix)) => Either.catchNonFatal(LocalDate.parse(s.stripSuffix(suffix))) match {
-        case Left(_) => NotValidLocalDateString.invalidNel
+        case Left(_) => NotValidLocalDateStringParam(s).invalidNel
         case Right(a@_) => Some(DateParams(after = Some(a))).validNel
       }
       case Some(s) if (s.contains(sep)) => {
@@ -79,15 +79,15 @@ object QryParamsValidationInterpreter extends QryParamsValidationAlgebra {
             val Array(a, b) = s.split(sep).filter(_.nonEmpty)
             DateParams(after = Some(LocalDate.parse(a)), before = Some(LocalDate.parse(b)))
         } match {
-            case Left(_) => NotValidLocalDateString.invalidNel
+            case Left(_) => NotValidLocalDateStringParam(s).invalidNel
             case Right(dateParams) => Some(dateParams).validNel
         }
       }
       case Some(s) => Either.catchNonFatal(LocalDate.parse(s)) match {
-        case Left(_) =>NotValidLocalDateString.invalidNel
+        case Left(_) =>NotValidLocalDateStringParam(s).invalidNel
         case Right(date) => Some(DateParams(exact = Some(date))).validNel
       }
-      case _ => NotValidLocalDateString.invalidNel
+      case v => NotValidLocalDateStringParam(v.toString).invalidNel
     }
   }
 
