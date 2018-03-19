@@ -8,7 +8,7 @@ import cats.implicits._
 import com.vacalendar.errors._
 import com.vacalendar.domain._
 
-class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends ServiceValidationAlgebra {
+object ServiceValidationInterpreter extends ServiceValidationAlgebra {
   
   type ValidationResult[A] = ValidatedNel[ServiceValidationError, A]
 
@@ -53,7 +53,7 @@ class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends Ser
     else ().validNel
   }
 
-  private def validateVacOnlyInFuture(vacIn: VacationIn): ValidationResult[Unit] = {
+  private def validateVacOnlyInFuture(vacIn: VacationIn, clock: Clock): ValidationResult[Unit] = {
     if (vacIn.since.isAfter(LocalDate.now(clock))) ().validNel
     else VacOnlyInFuture.invalidNel
   }
@@ -104,9 +104,9 @@ class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends Ser
     else TooManyEmplsOfOnePosOnVac.invalidNel
   }
 
-  def basicValidateVacIn(vacIn: VacationIn): Either[NonEmptyList[ServiceValidationError], VacationIn] = {
+  def basicValidateVacIn(vacIn: VacationIn, clock: Clock = Clock.systemUTC()): Either[NonEmptyList[ServiceValidationError], VacationIn] = {
     (validateVacDirection(vacIn),
-     validateVacOnlyInFuture(vacIn),
+     validateVacOnlyInFuture(vacIn, clock),
      validateVacPeriodWithin1Year(vacIn),
      validateMinVacPeriod(vacIn),
      validateMaxVacPeriod(vacIn)
@@ -158,7 +158,7 @@ class ServiceValidationInterpreter(clock: Clock = Clock.systemUTC()) extends Ser
     ).tupled.map(_ => vacIn).toEither
   }
 
-  def checkVacIsChangeable(vac: Vacation): Either[ServiceValidationError, Vacation] = 
+  def checkVacIsChangeable(vac: Vacation, clock: Clock = Clock.systemUTC()): Either[ServiceValidationError, Vacation] = 
     if (vac.since.isAfter(LocalDate.now(clock))) Either.right(vac)
     else Either.left(CannotChangeOrDeleteNotFutureVac)
   

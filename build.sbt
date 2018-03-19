@@ -7,7 +7,6 @@ version := "0.1"
 scalaVersion := "2.12.4"
 
 libraryDependencies ++= Seq(
-  Libraries.fastparse,
   Libraries.catsEffect,
   Libraries.fs2Core,
   Libraries.http4sServer,
@@ -24,7 +23,6 @@ libraryDependencies ++= Seq(
   Libraries.pureConfig,
   Libraries.logback,
   Libraries.scalaTest,
-  Libraries.scalaCheck,
   Libraries.testcontainersScala,
   Libraries.testcontainersPostgresql
 )
@@ -82,10 +80,5 @@ scalacOptions ++= Seq(
   // format: on
 )
 
-scalacOptions += "-Ypartial-unification"
-
 val badConsoleFlags = Seq("-Xfatal-warnings", "-Ywarn-unused:imports")
 scalacOptions in (Compile, console) ~= (_.filterNot(badConsoleFlags.contains(_)))
-
-
-// export SBT_OPTS="-XX:MaxMetaspaceSize=3500m -Xms1024m -Xmx3500m"

@@ -7,7 +7,6 @@ import org.http4s.Response
 
 import io.circe.{ Encoder, Json }
 import io.circe.syntax._
-import org.http4s.circe._
 
 import com.vacalendar.errors._
 
@@ -27,10 +26,15 @@ class EndpointErrorHandler[F[_] : Monad] extends Http4sDsl[F] {
     )
   }
 
+  implicit val encodeServiceValidationErrorWrapper: Encoder[AppError.ServiceValidationErrWrapper] = 
+    new Encoder[AppError.ServiceValidationErrWrapper] {
+      final def apply(err: AppError.ServiceValidationErrWrapper): Json = Json.obj(("error", err.error.asJson))
+    }
+
   implicit val encodeErrWrapper: Encoder[AppError] = new Encoder[AppError] {
     final def apply(errWrapper: AppError): Json = errWrapper match {
 
-      case AppError.ServiceValidationErrWrapper(err) => Json.obj(("error", err.asJson))
+      case e@AppError.ServiceValidationErrWrapper(_) => e.asJson
 
       case AppError.QryParamsValidationErrsWrapper(errNel) => Json.obj(
         ("error", Json.obj(
@@ -57,8 +61,10 @@ class EndpointErrorHandler[F[_] : Monad] extends Http4sDsl[F] {
 
   val handle: AppError => F[Response[F]] = {
     case AppError.DbErrWrapper(_) => InternalServerError()
-
-    case e => BadRequest(e.asJson)
+    case e@AppError.ServiceValidationErrWrapper(EmplNotFound) => NotFound(e.asJson.spaces2)
+    case e@AppError.ServiceValidationErrWrapper(VacNotFound) => NotFound(e.asJson.spaces2)
+    case e@AppError.ServiceValidationErrWrapper(PosNotFound) => NotFound(e.asJson.spaces2)
+    case e => BadRequest(e.asJson.spaces2)
   }
 }
 

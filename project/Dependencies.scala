@@ -12,16 +12,13 @@ object Dependencies {
     val Doobie                   = "0.5.0"
     val Flyway                   = "5.0.5"
     val ScalaTest                = "3.0.3"
-    val ScalaCheck               = "1.13.4"
     val Logback                  = "1.2.1"
     val TestcontainersScala      = "0.15.0"
     val TestcontainersPostgresql = "1.6.0"
     val PureConfig               = "0.9.0"
-    val Fastparse                = "1.0.0"
   }
 
   object Libraries {
-    lazy val fastparse                = "com.lihaoyi"           %% "fastparse"              % Versions.Fastparse
     lazy val cats                     = "org.typelevel"         %% "cats-core"              % Versions.Cats
     lazy val catsEffect               = "org.typelevel"         %% "cats-effect"            % Versions.CatsEffect
     lazy val fs2Core                  = "co.fs2"                %% "fs2-core"               % Versions.Fs2
@@ -40,7 +37,6 @@ object Dependencies {
     lazy val pureConfig               = "com.github.pureconfig" %% "pureconfig"             % Versions.PureConfig
     lazy val doobieHikari             = "org.tpolecat"          %% "doobie-hikari"          % Versions.Doobie
     lazy val scalaTest                = "org.scalatest"         %% "scalatest"              % Versions.ScalaTest                % Test
-    lazy val scalaCheck               = "org.scalacheck"        %% "scalacheck"             % Versions.ScalaCheck               % Test
     lazy val testcontainersScala      = "com.dimafeng"          %% "testcontainers-scala"   % Versions.TestcontainersScala      % Test
     lazy val testcontainersPostgresql = "org.testcontainers"    % "postgresql"              % Versions.TestcontainersPostgresql % Test
   }

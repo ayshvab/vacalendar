@@ -1,5 +1,6 @@
 package com.vacalendar.endpoints
 
+import java.time.Clock
 import cats.data._
 import cats.implicits._
 import cats.effect.Effect
@@ -18,7 +19,8 @@ import com.vacalendar.validation.QryParamsValidationAlgebra
 
 class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F], 
                                                V: QryParamsValidationAlgebra,
-                                               errHandler: EndpointErrorHandler[F]) extends Http4sDsl[F] {
+                                               errHandler: EndpointErrorHandler[F],
+                                               clock: Clock = Clock.systemUTC()) extends Http4sDsl[F] {
 
   implicit val vacInDecoder = jsonOf[F, VacationIn]
 
@@ -50,7 +52,7 @@ class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F],
         } yield vacs
 
         result.value.flatMap {
-          case Right(vacs) => Ok(vacs.asJson)
+          case Right(vacs) => Ok(vacs.asJson.spaces2)
           case Left(e) => errHandler.handle(e)
         }
       }
@@ -60,15 +62,16 @@ class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F],
   private def getEmplVacEndpoint: AuthedService[String, F] =  AuthedService {
     case GET -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) as _ =>
       vacService.getVac(emplId, vacId).value.flatMap {
-        case Right(found) => Ok(found.asJson)
+        case Right(found) if found.isDefined => Ok(found.asJson.spaces2)
+        case Right(_) => NotFound()
         case Left(e) => errHandler.handle(e)
       }
   }
 
   private def deleteEmplVacEndpoint: AuthedService[String, F] =  AuthedService {
     case DELETE -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) as _ =>
-      vacService.deleteVac(emplId, vacId).value.flatMap {
-        case Right(_) => Ok()
+      vacService.deleteVac(emplId, vacId, clock).value.flatMap {
+        case Right(_) => NoContent()
         case Left(e) => errHandler.handle(e)
       }
   }
@@ -78,11 +81,11 @@ class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F],
       val action = for {
         vacIn <- ar.req.as[VacationIn]
 
-        result <- vacService.createVac(emplId, vacIn).value
+        result <- vacService.createVac(emplId, vacIn, clock).value
       } yield result
 
       action.flatMap {
-        case Right(created) => Ok(created.asJson)
+        case Right(created) => Created(created.asJson.spaces2)
         case Left(e) => errHandler.handle(e)
       }
   }
@@ -91,11 +94,11 @@ class EmployeeVacationsEndpoints[F[_]: Effect](vacService: VacationService[F],
     case ar @ PATCH -> Root / "employees" / LongVar(emplId) / "vacations" / LongVar(vacId) as _ =>
       val action = for {
         vacIn <- ar.req.as[VacationIn]
-        result <- vacService.updateVac(emplId, vacId, vacIn).value
+        result <- vacService.updateVac(emplId, vacId, vacIn, clock).value
       } yield  result
 
       action.flatMap {
-        case Right(updated) => Ok(updated.asJson)
+        case Right(updated) => Ok(updated.asJson.spaces2)
         case Left(e) => errHandler.handle(e)
       }
   }

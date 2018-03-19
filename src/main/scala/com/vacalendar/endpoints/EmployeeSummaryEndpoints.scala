@@ -1,12 +1,12 @@
 package com.vacalendar.endpoints
 
+import java.time._
 import cats.data._
 import cats.implicits._
 import cats.effect.Effect
 
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.http4s.circe._
 
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
@@ -17,7 +17,8 @@ import com.vacalendar.validation.QryParamsValidationAlgebra
 
 class EmployeeSummaryEndpoints[F[_]: Effect](emplSummaryService: EmployeeSummaryService[F], 
                                              V: QryParamsValidationAlgebra,
-                                             errHandler: EndpointErrorHandler[F]) extends Http4sDsl[F] {
+                                             errHandler: EndpointErrorHandler[F],
+                                             clock: Clock = Clock.systemUTC()) extends Http4sDsl[F] {
 
   object OrderByQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("orderBy")
 
@@ -31,7 +32,7 @@ class EmployeeSummaryEndpoints[F[_]: Effect](emplSummaryService: EmployeeSummary
   object SinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("since")
   object UntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("until")
 
-  object OnVacQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("isOnVacacation")
+  object OnVacQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("isOnVacation")
   
   object CurrVacSinceQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currVac.since")
   object CurrVacUntilQueryParamMatcher extends OptionalQueryParamDecoderMatcher[String]("currVac.until")
@@ -48,8 +49,8 @@ class EmployeeSummaryEndpoints[F[_]: Effect](emplSummaryService: EmployeeSummary
 
   private def getEmplSummaryEndpoind: AuthedService[String, F] =  AuthedService {
       case GET -> Root / "employees" / "view=summary" / LongVar(emplId) as _ =>
-        emplSummaryService.getEmplSummary(emplId).value.flatMap {
-          case Right(summary) => Ok(summary.asJson)
+        emplSummaryService.getEmplSummary(emplId, clock).value.flatMap {
+          case Right(summary) => Ok(summary.asJson.spaces2)
           case Left(e) => errHandler.handle(e)
         }
     }
@@ -92,11 +93,11 @@ class EmployeeSummaryEndpoints[F[_]: Effect](emplSummaryService: EmployeeSummary
                                                          futureVacsUntil = futureVacsUntil)
               .leftMap[AppError](AppError.QryParamsValidationErrsWrapper)
             }
-            summaries <- emplSummaryService.getEmplSummaries(qryParams)
+            summaries <- emplSummaryService.getEmplSummaries(qryParams, clock)
           } yield summaries
 
           result.value.flatMap {
-            case Right(summaries) => Ok(summaries.asJson)
+            case Right(summaries) => Ok(summaries.asJson.spaces2)
             case Left(e) => errHandler.handle(e)
           }
         }

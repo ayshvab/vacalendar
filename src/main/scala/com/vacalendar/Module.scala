@@ -53,10 +53,8 @@ class Module[F[_]](implicit F: Effect[F]) {
     val posRepo = new PositionRepoInterpreter[F](xa)
     val emplSummaryRepo = new EmployeeSummaryRepoInterpreter[F](xa)
 
-    val serviceValidation = new ServiceValidationInterpreter()
-
-    val emplService = new EmployeeService[F](emplRepo, posRepo, serviceValidation)
-    val vacService = new VacationService[F](vacRepo, emplRepo, serviceValidation)
+    val emplService = new EmployeeService[F](emplRepo, posRepo, ServiceValidationInterpreter)
+    val vacService = new VacationService[F](vacRepo, emplRepo, ServiceValidationInterpreter)
     val emplSummaryService = new EmployeeSummaryService[F](emplSummaryRepo)
 
     val errHandler = new EndpointErrorHandler[F]()

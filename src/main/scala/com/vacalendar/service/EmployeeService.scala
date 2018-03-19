@@ -1,5 +1,6 @@
 package com.vacalendar.service
 
+import java.time._
 import cats.data._
 import cats.implicits._
 import cats.effect.Effect
@@ -17,13 +18,11 @@ class EmployeeService[F[_]: Effect](emplRepo: EmployeeRepoAlgebra[F],
   def getEmpls(qryParams: EmplsQryParams): EitherT[F, AppError, List[Employee]] =
     for {
       empls <- emplRepo.getEmpls(qryParams)
-        
     } yield empls
 
   def getEmpl(emplId: Long): EitherT[F, AppError, Option[Employee]] =
     for {
       foundEmpl <- emplRepo.getEmpl(emplId)
-        
     } yield foundEmpl
 
   def deleteEmpl(emplId: Long): EitherT[F, AppError, Employee] = 
@@ -36,7 +35,7 @@ class EmployeeService[F[_]: Effect](emplRepo: EmployeeRepoAlgebra[F],
 
     } yield deleted
 
-  def createEmpl(emplIn: EmployeeIn): EitherT[F, AppError, Employee] = 
+  def createEmpl(emplIn: EmployeeIn, clock: Clock): EitherT[F, AppError, Employee] = 
     for {
       optFoundPos <- posRepo.getPos(emplIn.positionId)
         
@@ -45,11 +44,11 @@ class EmployeeService[F[_]: Effect](emplRepo: EmployeeRepoAlgebra[F],
           .leftMap[AppError](AppError.ServiceValidationErrsWrapper)
       }
 
-      createdEmpl <- emplRepo.createEmpl(validEmplIn)
+      createdEmpl <- emplRepo.createEmpl(validEmplIn, clock)
 
     } yield createdEmpl
 
-  def updateEmpl(emplId: Long, emplIn: EmployeeIn): EitherT[F, AppError, Employee] =
+  def updateEmpl(emplId: Long, emplIn: EmployeeIn, clock: Clock): EitherT[F, AppError, Employee] =
     for {
       foundPos <- posRepo.getPos(emplIn.positionId)
         
@@ -58,7 +57,7 @@ class EmployeeService[F[_]: Effect](emplRepo: EmployeeRepoAlgebra[F],
           .leftMap[AppError](AppError.ServiceValidationErrsWrapper)
       }
         
-      optUpdatedEmpl <- emplRepo.updateEmpl(emplId, validEmplIn)
+      optUpdatedEmpl <- emplRepo.updateEmpl(emplId, validEmplIn, clock)
         
       updatedEmpl <- EitherT
         .fromOption[F](optUpdatedEmpl, EmplNotFound)

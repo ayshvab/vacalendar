@@ -1,5 +1,6 @@
 package com.vacalendar.endpoints
 
+import java.time.Clock
 import cats.data._
 import cats.implicits._
 import cats.effect.Effect
@@ -17,7 +18,8 @@ import com.vacalendar.validation.QryParamsValidationAlgebra
 
 class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
                                       V: QryParamsValidationAlgebra,
-                                      errHandler: EndpointErrorHandler[F]) extends Http4sDsl[F] {
+                                      errHandler: EndpointErrorHandler[F],
+                                      clock: Clock = Clock.systemUTC()) extends Http4sDsl[F] {
 
   implicit val employeeInDecoder = jsonOf[F, EmployeeIn]
 
@@ -37,11 +39,11 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
       case ar@POST -> Root / "employees" as _ =>
         val action = for {
           emplIn <- ar.req.as[EmployeeIn]
-          result <- emplService.createEmpl(emplIn).value
+          result <- emplService.createEmpl(emplIn, clock).value
         } yield result
 
         action.flatMap {
-          case Right(created) => Ok(created.asJson)
+          case Right(created) => Created(created.asJson.spaces2)
           case Left(e) => errHandler.handle(e)
         }
     }
@@ -50,11 +52,11 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
       case ar @ PATCH -> Root / "employees" / LongVar(emplId) as _ =>
         val action = for {
           emplIn <- ar.req.as[EmployeeIn]
-          result <- emplService.updateEmpl(emplId, emplIn).value
+          result <- emplService.updateEmpl(emplId, emplIn, clock).value
         } yield result
 
         action.flatMap {
-          case Right(updated) => Ok(updated.asJson)
+          case Right(updated) => Ok(updated.asJson.spaces2)
           case Left(e) => errHandler.handle(e)
         }
     }
@@ -62,7 +64,7 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
   private def deleteEmplEndpoint: AuthedService[String, F] = AuthedService {
       case DELETE -> Root / "employees" / LongVar(emplId) as _ =>
         emplService.deleteEmpl(emplId).value.flatMap {
-          case Right(_) => Ok()
+          case Right(_) => NoContent()
           case Left(e) => errHandler.handle(e)
         }
     }
@@ -84,7 +86,7 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
           } yield empls
 
           result.value.flatMap {
-            case Right(empls) => Ok(empls.asJson)
+            case Right(empls) => Ok(empls.asJson.spaces2)
             case Left(e) => errHandler.handle(e)
           }
       }
@@ -93,7 +95,8 @@ class EmployeeEndpoints[F[_]: Effect](emplService: EmployeeService[F],
   private def getEmplEndpoint: AuthedService[String, F] = AuthedService {
       case GET -> Root / "employees" / LongVar(emplId) as _ =>
         emplService.getEmpl(emplId).value.flatMap {
-          case Right(found) => Ok(found.asJson)
+          case Right(found) if found.isDefined => Ok(found.asJson.spaces2)
+          case Right(_) => NotFound()
           case Left(e) => errHandler.handle(e)
         }
     }
